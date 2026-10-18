@@ -1,0 +1,6 @@
+*.elc
+*~
+\#*\#
+.\#*
+.DS_Store
+/org-diff-src-autoloads.el
