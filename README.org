@@ -30,21 +30,7 @@ refinement faces from =diff-mode=: =diff-refine-removed=,
   newer is sufficient.
 - A =diff= executable.  GNU diffutils is recommended.  Labels are passed with
   =--label= when available and fall back to the portable =-L= option.
-- Optional: [[https://github.com/purcell/package-lint][package-lint]] for =make
-  package-lint=.
-
 * Installation
-
-** MELPA
-
-The package is being prepared for MELPA.  Once it is available:
-
-#+begin_src elisp
-(require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-(package-initialize)
-(package-install 'org-diff-src)
-#+end_src
 
 ** straight.el
 
@@ -263,12 +249,6 @@ make clean
 #+end_src
 
 The test suite is in [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]].
-
-The MELPA recipe for this repository is:
-
-#+begin_src emacs-lisp
-(org-diff-src :fetcher github :repo "TomoeMami/org-diff-src")
-#+end_src
 
 * License
 
