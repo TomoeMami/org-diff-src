@@ -5,7 +5,7 @@
 ;; Author: TomoeMami <trembleafterme@outlook.com>
 ;; Assisted-by: DeepSeek:deepseek-flash
 ;; Maintainer: TomoeMami <trembleafterme@outlook.com>
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: convenience
 ;; URL: https://github.com/TomoeMami/org-diff-src
@@ -37,6 +37,12 @@
 ;; lost when a diff is shown inside Org.  The `org-diff-src-mode' defined
 ;; here enables `diff-refine' = `font-lock' and turns the refinement
 ;; overlays into `face' text properties, which Org can copy.
+;;
+;; The default block language is `org-diff-src', which Org resolves
+;; to `org-diff-src-mode' without any setup.  If you already have
+;; blocks written as "ediff" (or another language), call
+;; `org-diff-src-setup' to map those languages to the mode; the
+;; languages to map are listed in `org-diff-src-extra-languages'.
 ;;
 ;; The core entry point is `org-diff-src-insert', which accepts any
 ;; unified diff string.  Diffs can be produced by the helpers
@@ -97,7 +103,32 @@ keep \"-u\" in the list."
   :group 'org-diff-src)
 
 (defconst org-diff-src--language "org-diff-src"
-  "Source language used for the generated Org blocks.")
+  "Built-in source language used for generated Org blocks.")
+
+(defcustom org-diff-src-default-language org-diff-src--language
+  "Default source language for blocks inserted by this package.
+The built-in `org-diff-src' language is resolved to
+`org-diff-src-mode' automatically.  To use another language, call
+`org-diff-src-setup' first so that it maps to the mode."
+  :type 'string
+  :group 'org-diff-src)
+
+(defcustom org-diff-src-extra-languages '("ediff")
+  "Additional source languages to map to `org-diff-src-mode'.
+`org-diff-src-setup' installs these mappings.  The default
+\"ediff\" keeps blocks written for the original Ediff-style
+snippet working.  Mapping \"diff\" here would override the normal
+`diff-mode' fontification for every Org diff block."
+  :type '(repeat string)
+  :group 'org-diff-src)
+
+(defcustom org-diff-src-fontify-immediately t
+  "Whether to fontify a newly inserted diff block immediately.
+Turning this off can speed up insertion of large diffs.  Org will
+fontify the block during a later fontification pass, or you can
+run `org-diff-src-refontify-block' explicitly."
+  :type 'boolean
+  :group 'org-diff-src)
 
 ;;;; Diff generation
 
@@ -241,17 +272,23 @@ temporary files."
 
 ;;;; Character-level refinement
 
+(defun org-diff-src--refinement-supported-p ()
+  "Return non-nil when diff-mode's refinement internals are available."
+  (and (fboundp 'diff--iterate-hunks)
+       (fboundp 'diff--refine-hunk)
+       (fboundp 'diff--overlay-auto-delete)))
+
 (defun org-diff-src--copy-fine-overlays (beg end)
   "Copy fine-grained refinement faces in BEG..END to text properties.
 Only overlays whose `diff-mode' property is `fine' are considered.
-The refinement face is prepended to the existing `face' property,
-so it takes precedence over the line-level `diff-removed' or
-`diff-added' face."
+Overlay ranges are clipped to BEG..END.  The refinement face is
+prepended to the existing `face' property, so it takes precedence
+over the line-level `diff-removed' or `diff-added' face."
   (dolist (overlay (overlays-in beg end))
     (when (eq (overlay-get overlay 'diff-mode) 'fine)
       (let ((face (overlay-get overlay 'face))
-            (start (overlay-start overlay))
-            (finish (overlay-end overlay)))
+            (start (max beg (overlay-start overlay)))
+            (finish (min end (overlay-end overlay))))
         (when (and face (< start finish))
           (let* ((old (get-text-property start 'face))
                  (faces (cond ((null old) nil)
@@ -266,7 +303,8 @@ This is a replacement for `diff--font-lock-refined' that records
 the refinement as `face' text properties instead of overlays, so
 that `org-src-font-lock-fontify-block' can copy it into the Org
 buffer."
-  (when (eq diff-refine 'font-lock)
+  (when (and (eq diff-refine 'font-lock)
+             (org-diff-src--refinement-supported-p))
     (when (get-char-property (point) 'diff--font-lock-refined)
       (goto-char (next-single-char-property-change
                   (point) 'diff--font-lock-refined nil max)))
@@ -289,66 +327,119 @@ buffer."
 (defun org-diff-src--font-lock-keywords ()
   "Return `diff-font-lock-keywords' with text-property refinement.
 Every occurrence of `diff--font-lock-refined' is replaced by
-`org-diff-src--font-lock-refined'."
-  (mapcar (lambda (keyword)
-            (if (or (eq keyword 'diff--font-lock-refined)
-                    (and (consp keyword)
-                         (eq (car keyword) 'diff--font-lock-refined)))
-                (list #'org-diff-src--font-lock-refined)
-              keyword))
-          diff-font-lock-keywords))
+`org-diff-src--font-lock-refined'.  If the required diff-mode
+internals are unavailable, return the keywords unchanged so that
+line-level highlighting still works."
+  (if (org-diff-src--refinement-supported-p)
+      (mapcar (lambda (keyword)
+                (if (or (eq keyword 'diff--font-lock-refined)
+                        (and (consp keyword)
+                             (eq (car keyword) 'diff--font-lock-refined)))
+                    (list #'org-diff-src--font-lock-refined)
+                  keyword))
+              diff-font-lock-keywords)
+    diff-font-lock-keywords))
 
 ;;;###autoload
 (define-derived-mode org-diff-src-mode diff-mode "Org-Diff"
   "Major mode for `org-diff-src' source blocks.
 This is `diff-mode' with `diff-refine' set to `font-lock'.  The
 refinement is written as `face' text properties so that Org can
-copy it from the fontification buffer into the Org buffer."
-  (setq-local diff-refine 'font-lock)
-  (setq-local diff-font-lock-keywords (org-diff-src--font-lock-keywords))
+copy it from the fontification buffer into the Org buffer.  The
+mode is also used for language aliases registered by
+`org-diff-src-setup'.
+
+If the required diff-mode refinement internals are unavailable,
+the mode keeps the normal line-level highlighting."
+  (when (org-diff-src--refinement-supported-p)
+    (setq-local diff-refine 'font-lock)
+    (setq-local diff-font-lock-keywords (org-diff-src--font-lock-keywords)))
   (font-lock-flush))
+
+;;;; Language registration
+
+(defun org-diff-src--register-language (language)
+  "Map LANGUAGE to `org-diff-src-mode' in `org-src-lang-modes'."
+  (let ((pair (assoc-string language org-src-lang-modes t)))
+    (if pair
+        (setcdr pair 'org-diff-src)
+      (push (cons language 'org-diff-src) org-src-lang-modes)))
+  language)
+
+;;;###autoload
+(defun org-diff-src-setup (&optional languages)
+  "Register LANGUAGES for `org-diff-src-mode'.
+LANGUAGES defaults to `org-diff-src-extra-languages'.  Each
+language is mapped in `org-src-lang-modes' so that Org uses
+`org-diff-src-mode' when fontifying blocks written in that
+language.  The built-in `org-diff-src' language does not need to
+be registered.
+
+Return the list of registered languages."
+  (interactive)
+  (let ((languages (or languages org-diff-src-extra-languages)))
+    (dolist (language languages)
+      (org-diff-src--register-language language))
+    (when (called-interactively-p 'interactive)
+      (message "org-diff-src: registered %s"
+               (mapconcat #'identity languages ", ")))
+    languages))
 
 ;;;; Inserting diffs into Org buffers
 
-(defun org-diff-src--fontify-block (beg end)
-  "Fontify the source block body between BEG and END."
+(defun org-diff-src--fontify-block (language beg end)
+  "Fontify the LANGUAGE source block body between BEG and END."
   (if (fboundp 'org-src-font-lock-fontify-block)
       (condition-case err
-          (org-src-font-lock-fontify-block org-diff-src--language beg end)
+          (org-src-font-lock-fontify-block language beg end)
         (error
-         (message "org-diff-src: could not fontify block: %s"
-                  (error-message-string err))))
+         (message "org-diff-src: could not fontify %s block: %s"
+                  language (error-message-string err))))
     (save-excursion
       (goto-char beg)
       (font-lock-ensure beg end))))
 
+(defun org-diff-src--check-language (language)
+  "Signal a user error unless LANGUAGE maps to `org-diff-src-mode'."
+  (unless (eq (org-src-get-lang-mode language) 'org-diff-src-mode)
+    (user-error "Language %s is not mapped to `org-diff-src-mode'; call `org-diff-src-setup' first"
+                language)))
+
 (defun org-diff-src--src-block-area ()
-  "Return (BEG END) for the `org-diff-src' block at point.
+  "Return (BEG END LANGUAGE) for the diff block at point.
+A block qualifies when its language maps to `org-diff-src-mode'.
 Return nil when point is not inside such a source block."
   (let ((element (org-element-at-point)))
-    (when (and (eq (org-element-type element) 'src-block)
-               (string= (or (org-element-property :language element) "")
-                        org-diff-src--language))
-      (let ((area (org-src--contents-area element)))
-        (list (nth 0 area) (nth 1 area))))))
+    (when (eq (org-element-type element) 'src-block)
+      (let ((language (org-element-property :language element)))
+        (when (and language
+                   (eq (org-src-get-lang-mode language)
+                       'org-diff-src-mode))
+          (let ((area (org-src--contents-area element)))
+            (list (nth 0 area) (nth 1 area) language)))))))
 
 ;;;###autoload
-(defun org-diff-src-insert (diff)
-  "Insert DIFF as a fontified `org-diff-src' source block at point.
+(defun org-diff-src-insert (diff &optional language)
+  "Insert DIFF as a fontified source block at point.
 DIFF should be a unified diff string.  If DIFF is nil or empty,
-insert `org-diff-src-no-diff-message' instead.  The block is
-fontified immediately; Org's normal source-block fontification
-refines it again when needed.
+insert `org-diff-src-no-diff-message' instead.  LANGUAGE defaults
+to `org-diff-src-default-language' and must map to
+`org-diff-src-mode'; the built-in `org-diff-src' language does so
+automatically.  Other languages require `org-diff-src-setup'.
 
-Return the position after the inserted block."
+The block is fontified immediately when
+`org-diff-src-fontify-immediately' is non-nil.  Return the
+position after the inserted block."
   (unless (derived-mode-p 'org-mode)
     (user-error "Not in an Org buffer"))
   (when (org-diff-src--inside-src-block-p)
     (user-error "Point is inside a source block"))
-  (let ((diff (or diff "")))
+  (let ((language (format "%s" (or language org-diff-src-default-language)))
+        (diff (or diff "")))
+    (org-diff-src--check-language language)
     (unless (bolp)
       (insert "\n"))
-    (insert "#+begin_src " org-diff-src--language "\n")
+    (insert "#+begin_src " language "\n")
     (let ((beg (point)))
       (if (string-empty-p diff)
           (insert org-diff-src-no-diff-message "\n")
@@ -357,8 +448,9 @@ Return the position after the inserted block."
           (insert "\n")))
       (let ((end (point)))
         (insert "#+end_src\n")
-        (org-diff-src--fontify-block beg end))
-      (point))))
+        (when org-diff-src-fontify-immediately
+          (org-diff-src--fontify-block language beg end))
+        (point)))))
 
 ;;;###autoload
 (defun org-diff-src-insert-diff-file (file)
@@ -401,7 +493,8 @@ triggering Org's normal fontification."
   (let ((area (org-diff-src--src-block-area)))
     (unless area
       (user-error "Not in an org-diff-src source block"))
-    (org-diff-src--fontify-block (nth 0 area) (nth 1 area))))
+    (org-diff-src--fontify-block
+     (nth 2 area) (nth 0 area) (nth 1 area))))
 
 ;;;; Comparing Org headings
 

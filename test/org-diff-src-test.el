@@ -176,6 +176,54 @@ Point is assumed to be in a buffer containing STRING."
     (should (string-match-p "^ \\*\\* Child\n-old\n\\+new\n"
                             (buffer-string)))))
 
+(ert-deftest org-diff-src-test-setup-default-alias ()
+  "`org-diff-src-setup' maps the default `ediff' alias."
+  (let ((org-src-lang-modes (copy-tree org-src-lang-modes)))
+    (org-diff-src-setup)
+    (should (eq (org-src-get-lang-mode "ediff") 'org-diff-src-mode))))
+
+(ert-deftest org-diff-src-test-language-alias ()
+  "A registered language is used and recognized for refontification."
+  (let ((org-src-lang-modes (copy-tree org-src-lang-modes))
+        (org-diff-src-default-language "org-diff-src-test-alias"))
+    (should (equal (org-diff-src-setup '("org-diff-src-test-alias"))
+                   '("org-diff-src-test-alias")))
+    (should (eq (org-src-get-lang-mode "org-diff-src-test-alias")
+                'org-diff-src-mode))
+    (org-diff-src-test-with-org ""
+      (org-diff-src-insert
+       (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n" "old" "new"))
+      (should (string-match-p "#\\+begin_src org-diff-src-test-alias"
+                              (buffer-string)))
+      (should (memq 'diff-refine-added
+                    (org-diff-src-test--faces-at "+TWO")))
+      (remove-text-properties (point-min) (point-max) '(face nil))
+      (search-backward "+TWO")
+      (org-diff-src-refontify-block)
+      (should (memq 'diff-refine-added
+                    (org-diff-src-test--faces-at "+TWO"))))))
+
+(ert-deftest org-diff-src-test-unregistered-language ()
+  "Insertion refuses a language not mapped to `org-diff-src-mode'."
+  (org-diff-src-test-with-org ""
+    (should-error
+     (org-diff-src-insert "--- a\n+++ b\n@@ -1 +1 @@\n-a\n+b\n"
+                          "org-diff-src-test-unregistered")
+     :type 'user-error)
+    (should (string-empty-p (buffer-string)))))
+
+(ert-deftest org-diff-src-test-no-immediate-fontify ()
+  "Insertion can defer fontification."
+  (org-diff-src-test-with-org ""
+    (let ((org-diff-src-fontify-immediately nil))
+      (org-diff-src-insert
+       (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n" "old" "new"))
+      (should-not (org-diff-src-test--faces-at "+TWO"))
+      (search-backward "+TWO")
+      (org-diff-src-refontify-block)
+      (should (memq 'diff-refine-added
+                    (org-diff-src-test--faces-at "+TWO"))))))
+
 (ert-deftest org-diff-src-test-wrap-region ()
   "A region containing a diff is replaced by a source block."
   (org-diff-src-test-with-org "--- old\n+++ new\n@@ -1 +1 @@\n-a\n+b\n"
