@@ -19,6 +19,8 @@ refinement faces from =diff-mode=: =diff-refine-removed=,
 - Render any unified diff string, not only diffs of Org subtrees.
 - Character-level highlighting inside the Org buffer, not just line-level
   added/removed faces.
+- Use the built-in =org-diff-src= language without setup, or register
+  =ediff=-style aliases with =org-diff-src-setup=.
 - Compare two Org subtrees, two files, or two buffers.
 - Copy subtrees without changing the kill ring or the system clipboard.
 - Start no Ediff session and require no package beyond Org and =diff-mode=.
@@ -44,7 +46,8 @@ With =use-package=:
 #+begin_src elisp
 (use-package org-diff-src
   :straight (:type git :host github :repo "TomoeMami/org-diff-src")
-  :commands (org-diff-src-compare-headings
+  :commands (org-diff-src-setup
+             org-diff-src-compare-headings
              org-diff-src-compare-files
              org-diff-src-compare-buffers
              org-diff-src-insert-diff-file
@@ -105,6 +108,36 @@ The changed characters (=Original= / =New= and =bar= / =BAR=) are refined with
 character-level faces.  The heading lines are part of the comparison, so a
 changed title appears in the diff as well.
 
+** Language names and aliases
+
+The default source language is =org-diff-src=.  Org resolves it to
+=org-diff-src-mode= automatically, so newly generated blocks need no setup.
+
+If you already have blocks written as =ediff= (for example from the original
+snippet), register the alias once:
+
+#+begin_src elisp
+(require 'org-diff-src)
+(org-diff-src-setup)
+#+end_src
+
+=org-diff-src-setup= maps every language in
+=org-diff-src-extra-languages= (default =("ediff")=) to
+=org-diff-src-mode=.  Run it before Org fontifies those blocks.
+
+To make newly inserted blocks use =ediff= as well:
+
+#+begin_src elisp
+(setq org-diff-src-default-language "ediff")
+#+end_src
+
+You can register more aliases explicitly.  Mapping =diff= makes every Org
+=diff= block use this mode, so do it only if that is what you want:
+
+#+begin_src elisp
+(org-diff-src-setup '("ediff" "diff"))
+#+end_src
+
 ** Render a diff you already have
 
 - Copy a diff (for example from Magit) and run
@@ -134,6 +167,7 @@ block without triggering fontification, run:
 
 | Command                            | Purpose                                             |
 |------------------------------------+-----------------------------------------------------|
+| =org-diff-src-setup=               | Register language aliases such as =ediff=.          |
 | =org-diff-src-compare-headings=    | Compare two subtrees in the current Org buffer.     |
 | =org-diff-src-compare-files=       | Compare two files.                                  |
 | =org-diff-src-compare-buffers=     | Compare two buffers.                                |
@@ -147,9 +181,15 @@ block without triggering fontification, run:
 The diff-generation and insertion functions are independent of the interactive
 commands, so they can be used from other packages.
 
-- =(org-diff-src-insert DIFF)= :: Insert =DIFF= as a fontified
-  =org-diff-src= block at point.  Return the position after the block.  If
-  =DIFF= is nil or empty, insert =org-diff-src-no-diff-message=.
+- =(org-diff-src-insert DIFF &optional LANGUAGE)= :: Insert =DIFF= as a
+  fontified source block at point.  =LANGUAGE= defaults to
+  =org-diff-src-default-language= and must map to =org-diff-src-mode=; the
+  built-in =org-diff-src= language does so automatically.  Return the position
+  after the block.  If =DIFF= is nil or empty, insert
+  =org-diff-src-no-diff-message=.
+- =(org-diff-src-setup &optional LANGUAGES)= :: Register =LANGUAGES= (default
+  =org-diff-src-extra-languages=) for =org-diff-src-mode=.  Return the list of
+  registered languages.
 - =(org-diff-src-diff-strings OLD NEW &optional OLD-LABEL NEW-LABEL CODING)= ::
   Return a unified diff between the strings =OLD= and =NEW=.
 - =(org-diff-src-diff-files OLD-FILE NEW-FILE &optional OLD-LABEL NEW-LABEL)= ::
@@ -183,9 +223,10 @@ To compare two buffers programmatically:
                             "before" "after"))
 #+end_src
 
-The source language is always =org-diff-src=.  Org resolves it to
-=org-diff-src-mode= through =org-src-get-lang-mode=; no entry in
-=org-src-lang-modes= is needed.
+The default source language is =org-diff-src=; Org resolves it to
+=org-diff-src-mode= through =org-src-get-lang-mode=, so no entry in
+=org-src-lang-modes= is needed.  Aliases registered with
+=org-diff-src-setup= are resolved the same way.
 
 * How it works
 
@@ -204,9 +245,13 @@ normally lost when a diff is displayed inside Org.
 4. Org's =org-src-font-lock-fontify-block= can then copy those properties into
    the Org buffer.
 
-This is also why the block language is =org-diff-src= rather than =diff=.
-The latter maps to plain =diff-mode=, whose refinement overlays would not
-survive the copy into Org.
+If a future Emacs version removes the diff-mode refinement internals,
+=org-diff-src-mode= keeps the normal line-level highlighting instead of
+failing.
+
+This is why the default block language is =org-diff-src= rather than =diff=.
+The latter maps to plain =diff-mode= unless you explicitly register it as an
+alias.
 
 * Customization
 
@@ -215,6 +260,12 @@ survive the copy into Org.
   refinement code expects a unified diff.
 - =org-diff-src-no-diff-message= :: Text inserted when the diff is empty.  The
   default is =# No differences=.
+- =org-diff-src-default-language= :: Language used for inserted blocks.  The
+  default is ="org-diff-src"=.
+- =org-diff-src-extra-languages= :: Languages registered by
+  =org-diff-src-setup=.  The default is =("ediff")=.
+- =org-diff-src-fontify-immediately= :: Whether to fontify newly inserted
+  blocks immediately.  The default is =t=; turn it off for very large diffs.
 - Faces :: The refinement uses =diff-refine-removed=,
   =diff-refine-added=, and =diff-refine-changed=.  Customize them with
   =M-x customize-face= or in =custom-set-faces=.
@@ -232,6 +283,8 @@ global value of =diff-refine=.
 - Very large diffs can be slow to fontify because refinement is done per
   changed character.
 - Labels for the two diff sides are reduced to one line.
+- If a future Emacs removes the diff-mode refinement internals, the package
+  falls back to line-level highlighting.
 - =org-diff-src-compare-headings= compares whole subtrees, including the
   heading lines.  Use =org-diff-src-diff-strings= if you want to compare only
   selected body text.
@@ -249,6 +302,27 @@ make clean
 #+end_src
 
 The test suite is in [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]].
+
+** Adding another diff source
+
+A producer is simply a function that returns a unified diff string.  For
+example:
+
+#+begin_src elisp
+(defun my/org-diff-src-from-git (rev-a rev-b)
+  "Return a unified diff between REV-A and REV-B."
+  (with-temp-buffer
+    (let ((status (call-process "git" nil t nil
+                                "diff" "-u" (concat rev-a ".." rev-b))))
+      (unless (memq status '(0 1))
+        (error "git diff failed: %s" (buffer-string))))
+    (buffer-string)))
+
+(org-diff-src-insert (my/org-diff-src-from-git "HEAD~1" "HEAD"))
+#+end_src
+
+The rendering layer only cares about the unified diff text, so new producers
+do not need to touch =org-diff-src-mode=.
 
 * License
 
