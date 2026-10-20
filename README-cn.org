@@ -104,6 +104,9 @@ foo BAR baz
 发生变化的字符（ =Original= / =New= 以及 =bar= / =BAR= ）会使用字符级 face
 高亮。标题行也属于比较范围，因此标题本身的变化也会出现在差异中。
 
+#+caption: 渲染后的 diff 块，包含字符级高亮。截图中的块使用 =ediff= 别名。
+[[file:images/org-diff-src-example-cn.png]]
+
 ** 语言名与别名
 
 默认源码语言是 =org-diff-src= 。Org 会自动把它解析为
