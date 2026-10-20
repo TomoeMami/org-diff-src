@@ -108,6 +108,10 @@ The changed characters (=Original= / =New= and =bar= / =BAR=) are refined with
 character-level faces.  The heading lines are part of the comparison, so a
 changed title appears in the diff as well.
 
+#+caption: A rendered diff block with character-level refinement.  The
+#+caption: screenshot uses the =ediff= alias.
+[[file:images/org-diff-src-example.png]]
+
 ** Language names and aliases
 
 The default source language is =org-diff-src=.  Org resolves it to
