@@ -14,6 +14,9 @@ The generated block uses the source language =org-diff-src= and the
 refinement faces from =diff-mode=: =diff-refine-removed=,
 =diff-refine-added=, and =diff-refine-changed=.
 
+For a behavior-only specification intended for independent implementations,
+see [[*Clean-room development][Clean-room development]].
+
 * Features
 
 - Render any unified diff string, not only diffs of Org subtrees.
@@ -327,6 +330,233 @@ example:
 
 The rendering layer only cares about the unified diff text, so new producers
 do not need to touch =org-diff-src-mode=.
+
+** Clean-room development
+
+This section is for developers who want to implement the same user-visible
+behavior independently, for Emacs, for Org, or for another editor, without
+copying this package's code or prose.  It follows the clean-room practice used
+in GNU and other free-software projects: one group derives a specification from
+public documentation and observable behavior; a separate group writes the
+implementation from that specification alone.
+
+The specification is detailed about the problem, the constraints, and the
+required behavior, and deliberately silent about the mechanism.  It contains no
+code, no function or variable names, no data structures, no regular expressions,
+and no step-by-step recipe.  Those choices belong to the independent
+implementer.  The rest of this README documents this particular implementation;
+for a strict clean-room process, use only this section, public Emacs and Org
+documentation, and black-box observation.
+
+The same discipline applies when the implementer is an AI assistant.  The
+section is self-contained so that it can be used as the only project-specific
+input; an assistant should not be asked to reconstruct the package from memory
+or from its source.  The notes on AI-assisted work below also serve as a
+practical AI-usage policy for such work.
+
+This section is not legal advice, and it is not a substitute for a documented
+two-team clean-room process.  It is a behavioral specification template.  If
+your situation needs a legally defensible clean-room record, have someone who
+has not seen the source prepare the specification independently, and keep the
+experiments, reviews, and communications.
+
+*** The problem and the central constraint
+
+Org can display a source block containing a unified diff, but a diff shown this
+way often loses the character-level refinement that the editor's built-in diff
+mode provides in a dedicated buffer.  The user sees whole added and removed
+lines, but not the exact characters that changed.  The task is to restore that
+distinction inside the Org buffer itself, without starting an Ediff session and
+without requiring a package beyond Org and the editor's built-in diff support.
+
+The difficult part is not parsing a unified diff.  It is understanding how Org
+turns source-block text into displayed text, and choosing a refinement
+representation that survives that path.
+
+A central constraint, which an independent implementer should confirm rather
+than assume, is that Org does not simply run a major mode over the block text in
+the Org buffer.  It prepares the display in an indirect context and transfers
+part of the result back.  The transfer is lossy: some display information
+survives, some does not.  A refinement that looks perfect in a dedicated buffer
+can disappear completely inside Org.
+
+This is the constraint to investigate first, and it is the part an independent
+implementation should discover for itself.  The general strategy is:
+
+- Treat the fontification boundary as a contract.  Determine, through public
+  experiments in Org, which display representations survive the boundary and
+  which do not.  Record the experiments and their results.
+- Choose a representation for the refinement that is inside the surviving
+  subset, and arrange for the refinement to be computed where that
+  representation can be produced.
+- Separate the diff parser from the refinement renderer.  The parser decides
+  which lines are added, removed, or context, and which character ranges within
+  a changed line belong to each side.  The renderer turns those ranges into
+  display attributes.  Either can be replaced without rewriting the other.
+- Reuse the editor's existing diff parsing and line-level faces where that is
+  practical.  A from-scratch parser is allowed, but it is not the source of the
+  feature's value and it increases the chance of behavioral drift.
+- Keep a seam around any private editor behavior you rely on, so that a future
+  version can fall back to line-level display.  Prefer public, documented
+  interfaces; treat private ones as optional accelerators, not as foundations.
+- Verify in the destination buffer, after the normal fontification path, not in
+  the temporary buffer where the refinement was computed.
+
+There is more than one valid design.  The specification requires the visible
+result, not a particular mechanism.
+
+*** Conceptual architecture
+
+A useful separation has four layers:
+
+1. Producer: turns inputs into unified-diff text.
+2. Inserter: wraps that text in a source block and places it in the Org buffer.
+3. Refiner: computes the changed character ranges and their display.
+4. Integration: makes the inserter and the refiner meet the fontification
+   boundary.
+
+The producer layer must be replaceable; the refinement layer must not need to
+know where the text came from; only the integration layer needs to know about
+Org's fontification behavior.  This keeps the clean-room boundary small and the
+tests focused.
+
+*** Required behavior
+
+A conforming implementation must satisfy these observable requirements.  They
+are written as acceptance criteria, not as a design.
+
+1. *Rendering.* A unified diff inserted into an Org buffer is displayed as an
+   Org source block.  Added, removed, and context lines receive the usual
+   line-level diff treatment.  Within changed lines, the characters that
+   actually differ are visually distinguished from unchanged characters.
+2. *Persistence.* The character-level result is present in the Org buffer after
+   normal fontification, and is restored after the block is edited and fontified
+   again.  It must not depend on a temporary buffer remaining alive.
+3. *Producers.* The same rendering path accepts diffs from independent
+   producers: two strings, two files, two buffers, two Org subtrees, an existing
+   diff file, the active region, and the kill ring.  A producer only has to
+   supply valid unified-diff text; it must not need to know how refinement is
+   rendered.
+4. *No hidden sessions.* Rendering does not start Ediff, create a frame, or
+   leave extra windows or buffers behind.  Any temporary window change is
+   restored before the command returns.
+5. *No clipboard or kill-ring side effects.* Comparing or rendering a diff must
+   not change the kill ring, the yank pointer, or the system clipboard.  Reading
+   a diff from the kill ring is allowed; writing to it is not.
+6. *No file side effects.* Comparing files reads them; it does not modify them.
+   Temporary copies of remote files are cleaned up.
+7. *Empty input.* An empty diff produces a documented placeholder instead of an
+   error or an empty block.
+8. *Format tolerance.* Unified diffs are refined.  Other diff formats and
+   malformed input are displayed as text without signaling an error.  A
+   refinement failure must not make the block unreadable.
+9. *Legacy names.* A user can map an existing source-block language name to the
+   new renderer.  Registering an alias must not change the behavior of unrelated
+   blocks, and mapping a generic name such as "diff" is an explicit opt-in.
+10. *Graceful degradation.* If the editor changes the internals on which
+    refinement depends, the block keeps working with line-level highlighting.
+    The fallback is decided when the block is rendered, not by failing to load
+    the package.
+11. *Cost.* Rendering time and memory grow with the size of the diff and the
+    changed regions.  Large diffs may be slow, but an interrupted render must
+    leave the buffer valid and must not stack duplicate faces on a retry.
+12. *Export.* The diff text is part of the document and exports normally.  The
+    character colors are display attributes; an implementation need not
+    preserve them in HTML or PDF export, but it must not corrupt the exported
+    text.
+
+*** What this specification leaves out
+
+This specification does not name:
+
+- which Org or diff-mode interfaces, internal hooks, or data structures to use;
+- which display mechanism carries the refinement;
+- how display information crosses the fontification boundary;
+- parsing algorithms, regular expressions, or data structures;
+- command names, customization names, source-block delimiters, or error
+  messages;
+- file layout, implementation order, or test fixtures.
+
+These are implementation choices.  If a behavior cannot be tested without
+naming a private mechanism, it is probably specified at the wrong level; restate
+it as something a user can observe.
+
+*** Verification without contamination
+
+- Write the acceptance tests from this section before writing the
+  implementation.
+- Drive the public commands only; inspect the Org buffer after normal
+  fontification.
+- Assert on position, visible text, and face properties.  Do not assert on
+  temporary buffers, internal display objects, or private variables.
+- Cover at least: empty diff, single-character change, whole-line replacement,
+  added and removed files, binary diff, CRLF, non-ASCII, a very long line, a
+  missing trailing newline, and a malformed hunk header.
+- Snapshot the kill ring, clipboard, buffer list, window configuration, and file
+  modification times before and after each command.
+- Run the suite on the oldest and newest supported Emacs, with a clean init, and
+  with font-lock both on and off.  With font-lock off, the block must still be
+  readable even if refinement is absent.
+- Do not copy this repository's tests; they are part of the implementation and
+  may encode its mechanism.
+
+*** AI-assisted clean-room work
+
+AI assistants are useful in both rooms, but they must not become a channel
+between them.
+
+- In the specification room, AI may summarize public manuals, release notes,
+  bug reports, and observed behavior, and may help turn them into requirements
+  and test ideas.  Do not give it the original source, comments, or the
+  implementation sections of this README, and do not ask it to reconstruct the
+  package.
+- In the implementation room, give the assistant the frozen specification and
+  public platform documentation only.  This section is written to be
+  self-contained for that purpose.
+- Keep provenance: prompts, model and version, dates, and outputs.  Review the
+  output for similarity to the original, not only for correctness.  Similarity
+  is evidence, not proof; rewrite anything that looks derivative.
+- Disclose AI assistance where the project records such things, for example in
+  an =Assisted-by= commit trailer.  Disclosure does not transfer
+  responsibility: a human maintainer reviews and accepts the result.
+- Do not assume that model output is free of third-party obligations.  In some
+  jurisdictions, material generated purely by a model may not attract copyright
+  at all, or its authorship may be uncertain; human selection, arrangement, and
+  revision are what make the result dependable.  Keep the provider's terms and
+  make a named human accountable.
+- If a model was trained on the original repository, its output is not
+  automatically a copy, but the risk is higher.  Prefer specification-only
+  prompts and audit the result.
+- If law or platform policy requires labeling AI-generated content, follow it;
+  a commit trailer and a release note are a reasonable start.
+
+These are reasonable norms for AI-assisted contributions to Emacs and Org as
+well: describe the behavior, disclose the tool, review the diff, and keep the
+record.
+
+*** Licensing boundary
+
+- Copyright protects expression, not ideas, methods, or functional behavior.
+  Clean-room development is evidence of independent creation; it is not a
+  universal legal shield, and the analysis varies by jurisdiction.
+- An independent implementation that copies no code, comments, or prose from
+  this package can be licensed as its author chooses.  If you copy or adapt code
+  or text from this repository, GPL-3.0-or-later applies to the copied material
+  and may affect the combined work.
+- Compatibility does not require reusing this package's names or interfaces.
+  Choose your own names; refer to this package as prior art, not as an
+  endorsement.
+- Patents, trademarks, and trade secrets are outside the scope of this section.
+  For a commercial or high-stakes port, consult a lawyer.
+
+*** Applying the pattern elsewhere
+
+The same reasoning applies to any Emacs or Org feature that wants rich display
+inside a source block: identify the fontification boundary, discover the
+transferable subset, keep producers and renderers separate, provide a fallback,
+and test in the destination buffer.  Diff refinement is one instance; inline
+annotations, syntax-aware folding, and previews of external data are others.
+The clean-room method is independent of the feature.
 
 * License
 
