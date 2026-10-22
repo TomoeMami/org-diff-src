@@ -1,50 +1,71 @@
 #+title: org-diff-src
-#+subtitle: 在 Org 源码块中显示字符级高亮差异
+#+subtitle: 把 Diff mode 的细粒度高亮带入 Org 源码块
 #+author: TomoeMami
+#+language: zh
 #+options: toc:2 num:nil
 
-=org-diff-src= 将 unified diff（统一差异格式）显示为 Org 源码块，并把高亮
-细化到实际发生变化的字符。它适合把可审阅的差异保存在笔记、issue 或 Org
-文档中，而不必启动 Ediff 会话。
+#+html: <a href="https://www.gnu.org/software/emacs/"><img alt="Emacs 27.1 或更高" src="https://img.shields.io/badge/Emacs-27.1%2B-blue"/></a>
+#+html: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue"/></a>
+
+# MELPA 收录后可以加上这个徽章：
+# #+html: <a href="https://melpa.org/#/org-diff-src"><img alt="MELPA" src="https://melpa.org/packages/org-diff-src-badge.svg"/></a>
 
 英文版见 [[file:README.org][README.org]]。
 
-生成的源码块使用 =org-diff-src= 语言，高亮使用 =diff-mode= 的细化 face：
-=diff-refine-removed= 、 =diff-refine-added= 和 =diff-refine-changed= 。
+Org 会用 [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diff-Mode.html][Diff mode]] 渲染 ~diff~ 源码块，但其中的细粒度高亮通常会消失：
+Org 只从用于字体化源码块的临时缓冲区复制 font-lock 的 ~face~ 属性，而 Diff
+mode 的 refinement（细化）保存在 overlay 里。~org-diff-src~ 提供
+~org-diff-src-mode~：一个派生自 ~diff-mode~ 的小模式，它把同样的细化记录为
+~face~ 文本属性，因此发生变化的字词在 Org 缓冲区中仍然带有颜色。
 
-如果希望独立实现相同行为，文末的
-[[*净室开发][净室开发]]只描述行为与约束，不包含实现细节。
+渲染结果是普通的 Org 源码块，可以折叠、编辑和导出，也不会启动 Ediff 会话。
+diff 可以来自两个字符串、两个文件、两个缓冲区或两个 Org 子树。通过三行配置，
+本包还可以接管所有 ~diff~ 源码块的默认显示方式。
+
+#+caption: Org 源码块中的 Diff mode 细化效果。截图使用 ~ediff~ 别名；完成最简配置后，普通 ~diff~ 源码块看起来是一样的。
+[[file:images/org-diff-src-example-cn.png]]
+
+如果希望独立实现相同行为，可参阅 [[file:CLEAN-ROOM-cn.org][净室规格]]（英文：
+[[file:CLEAN-ROOM.org][CLEAN-ROOM.org]]）。
 
 * 功能
 
-- 可以渲染任意 unified diff 字符串。
-- 在 Org 缓冲区中提供字符级高亮，而不只是整行的新增/删除 face。
-- 默认使用内置的 =org-diff-src= 语言，无需额外配置；也可以通过
-  =org-diff-src-setup= 注册 =ediff= 等别名，或用三行配置接管所有
-  =diff= 源码块。
+- 把任意 unified diff 渲染为 Org 源码块。
+- 在 Org 缓冲区中保留 Diff mode 的细化，而不只是整行的新增/删除 face。
+- 用 ~diff-refine-removed~ 、 ~diff-refine-added~ 和 ~diff-refine-changed~
+  为发生变化的字词（以及词内变化的字符）上色。
+- 通过内置的 ~org-diff-src~ 语言工作，无需额外配置。
+- 通过三行配置接管已有的 ~diff~ 源码块。
 - 比较两个 Org 子树、两个文件或两个缓冲区。
-- 复制子树时不会修改 kill ring（剪贴环）或系统剪贴板。
-- 不启动 Ediff 会话，除 Org 和 =diff-mode= 外不依赖其他包。
-- 使用标准的补全界面，不要求安装 Consult。
+- 复制子树时不修改 kill ring 或系统剪贴板。
+- 不启动 Ediff 会话，除 Org 和 Diff mode 外不依赖其他包。
+- 使用标准补全界面，不要求 Consult。
+- 如果 Diff mode 的细化内部接口发生变化，退回行级高亮。
 
 * 环境要求
 
-- Emacs 27.1 或更高版本。Emacs 27.1 自带的 Org（9.3）或更高版本即可。
-- 一个 =diff= 可执行文件。推荐 GNU diffutils。程序会优先使用
-  =--label= 传递标签；如果不可用，则回退到可移植的 =-L= 选项。
+- Emacs 27.1 或更高。Emacs 27.1 自带的 Org 9.3 已经足够。
+- 一个 ~diff~ 可执行文件。推荐 GNU diffutils。程序会优先使用 ~--label~ ，
+  不可用时退回可移植的 ~-L~ 选项。
 
 * 安装
 
+** MELPA
+
+MELPA 配方正在提交中。收录后可以这样安装：
+
+=M-x package-install RET org-diff-src RET=
+
 ** straight.el
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (straight-use-package
  '(org-diff-src :type git :host github :repo "TomoeMami/org-diff-src"))
 #+end_src
 
 配合 =use-package= ：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (use-package org-diff-src
   :straight (:type git :host github :repo "TomoeMami/org-diff-src")
   :commands (org-diff-src-setup
@@ -59,38 +80,44 @@
 
 ** 手动安装
 
-克隆仓库并将目录加入 =load-path=：
+克隆仓库并将目录加入 ~load-path~ ：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (add-to-list 'load-path "/path/to/org-diff-src")
 (require 'org-diff-src)
 #+end_src
 
-** 最简配置：接管 diff 源码块
+* 最简配置：接管 diff 源码块
 
-默认情况下本包不会改动 =diff= 源码块，只是新增了 =org-diff-src= 语言。
-如果希望覆盖 =diff= 源码块原有的显示方式，并让新插入的源码块也使用
-=diff= 语言，只需要三行：
+本包默认不改变 ~diff~ 源码块，只新增 ~org-diff-src~ 语言。如果希望所有
+~diff~ 源码块都使用 ~org-diff-src-mode~ ，并让新插入的源码块使用 ~diff~
+语言，在 init 文件中加入三行：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (require 'org-diff-src)                     ; 加载本包和 Org
 (org-diff-src-setup '("diff"))              ; diff -> org-diff-src-mode
 (setq org-diff-src-default-language "diff") ; 新插入的块使用 diff
 #+end_src
 
-Org 默认把 =diff= 语言解析为 =diff-mode= ，所以 =diff= 块只有整行的新增/
-删除高亮。第二行把 =diff= 映射到 =org-diff-src-mode= ，它派生自
-=diff-mode= ，并额外提供字符级细化。该映射对已有和新建的 =diff= 块都生效；
-已经显示出来的块会在下一次字体化时细化，也可以立即执行
-=M-x org-diff-src-refontify-block= 。
+第二行是真正的接管。Org 默认把 ~diff~ 解析为 ~diff-mode~ ，因此 ~diff~ 块
+只有整行的新增/删除 face；把 ~diff~ 映射到 ~org-diff-src-mode~ 后，才会
+获得 Diff mode 的细化。该映射对已有和新建的源码块都生效；已经显示出来的块会
+在下一次字体化时细化，也可以立即执行 =M-x org-diff-src-refontify-block= 。
 
-第三行只决定插入和比较命令写成什么语言。不设置它时，新生成的块仍然使用
-=org-diff-src= 。
+第三行只改变 ~org-diff-src-insert~ 和比较命令写入的语言。省略它，新块仍然
+使用 ~org-diff-src~ 语言；[[*使用][使用]] 中的示例假定使用这个默认值。
 
-如果使用 =use-package= ，请不要延迟加载：映射必须在 Org 第一次字体化
-=diff= 块之前就已经安装。
+这是显式选择：所有 ~diff~ 源码块都会受影响，包括其他包生成的块。
+~org-diff-src-mode~ 派生自 ~diff-mode~ ，所以 =C-c '= 编辑、hunk 命令、
+导航和折叠都仍然可用。要恢复原有 ~diff-mode~ 显示，请删掉第二行，并把
+~org-diff-src-default-language~ 改回 ~"org-diff-src"~ 。只有 unified diff
+会被细化。
 
-#+begin_src elisp
+** 使用 use-package
+
+不要延迟加载：映射必须在 Org 第一次字体化 ~diff~ 块之前就已经安装。
+
+#+begin_src emacs-lisp
 (use-package org-diff-src
   :straight (:type git :host github :repo "TomoeMami/org-diff-src")
   :demand t
@@ -99,10 +126,15 @@ Org 默认把 =diff= 语言解析为 =diff-mode= ，所以 =diff= 块只有整�
   (setq org-diff-src-default-language "diff"))
 #+end_src
 
-这是显式接管：它会改变所有 =diff= 源码块，包括其他包生成的块。由于
-=org-diff-src-mode= 派生自 =diff-mode= ，用 =C-c '= 编辑、导航和 hunk
-命令都仍然可用。只有 unified diff 会被细化，其他格式的行为见
-[[*限制][限制]]。
+** 不接管 diff 源码块
+
+内置的 ~org-diff-src~ 语言无需额外配置：
+
+#+begin_src emacs-lisp
+(require 'org-diff-src)
+(org-diff-src-insert
+ (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n"))
+#+end_src
 
 * 使用
 
@@ -113,17 +145,17 @@ Org 默认把 =diff= 语言解析为 =diff-mode= ，所以 =diff= 块只有整�
 =M-x org-diff-src-compare-headings=
 
 先选择原始标题，再选择新标题。两个子树会在不修改 kill ring 和系统剪贴板
-的情况下被复制，统一提升到一级标题，用 =diff= 比较，然后以
-=org-diff-src= 源码块的形式插入到光标处。
+的情况下被复制，统一提升到一级标题，用 ~diff~ 比较，然后以
+~org-diff-src~ 源码块的形式插入到光标处。
 
 例如，对于下面的内容：
 
 #+begin_src org
-* Original
+,* Original
 Some text.
 foo bar baz
 
-* New
+,* New
 Some text.
 foo BAR baz
 #+end_src
@@ -143,43 +175,39 @@ foo BAR baz
 #+end_src
 #+end_example
 
-发生变化的字符（ =Original= / =New= 以及 =bar= / =BAR= ）会使用字符级 face
-高亮。标题行也属于比较范围，因此标题本身的变化也会出现在差异中。
-
-#+caption: 渲染后的 diff 块，包含字符级高亮。截图中的块使用 =ediff= 别名。
-[[file:images/org-diff-src-example-cn.png]]
+发生变化的字词（ =Original= / =New= 以及 =bar= / =BAR= ）会使用 Diff mode
+的细化 face 上色。标题行也属于比较范围，因此标题本身的变化也会出现在差异中。
 
 ** 语言名与别名
 
-默认源码语言是 =org-diff-src= 。Org 会自动把它解析为
-=org-diff-src-mode= ，因此新生成的源码块不需要额外配置。
+默认源码语言是 ~org-diff-src~ 。Org 会自动把它解析为
+~org-diff-src-mode~ ，因此新生成的 ~org-diff-src~ 源码块不需要额外配置。
 
-如果你已经有写成 =ediff= 的源码块（例如来自最初的 snippet），注册一次别名
+如果你已经有写成 ~ediff~ 的源码块（例如来自最初的 snippet），注册一次别名
 即可：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (require 'org-diff-src)
 (org-diff-src-setup)
 #+end_src
 
-=org-diff-src-setup= 会把 =org-diff-src-extra-languages= （默认
-=("ediff")= ）中的每个语言映射到 =org-diff-src-mode= 。请在 Org 字体化
+~org-diff-src-setup~ 会把 ~org-diff-src-extra-languages~ （默认
+~("ediff")~ ）中的每个语言映射到 ~org-diff-src-mode~ 。请在 Org 字体化
 这些源码块之前执行。
 
-如果希望新插入的源码块也使用 =ediff= ：
+如果希望新插入的源码块也使用 ~ediff~ ：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (setq org-diff-src-default-language "ediff")
 #+end_src
 
 也可以显式注册更多别名：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (org-diff-src-setup '("ediff" "diff"))
 #+end_src
 
-把 =diff= 映射进来会让所有 Org =diff= 源码块都使用本模式。完整配置（包括
-新插入源码块使用的语言）见 [[*最简配置：接管 diff 源码块][最简配置]]。
+接管 ~diff~ 源码块的完整配置见 [[*最简配置：接管 diff 源码块][最简配置]]。
 
 ** 渲染已有的 diff
 
@@ -193,54 +221,54 @@ foo BAR baz
 ** 比较文件或缓冲区
 
 - =M-x org-diff-src-compare-files= 会依次询问原始文件和新文件。
-- =M-x org-diff-src-compare-buffers= 会依次询问原始缓冲区和新缓冲区。
+- =M-x org-diff-src-compare-buffers= 会依次询问原始缓冲区和新的缓冲区。
 
-两个命令都会把结果插入到当前 Org 缓冲区的光标处。
+两个命令都会把结果插入当前 Org 缓冲区的光标处。
 
 ** 重新字体化源码块
 
-Org 通常会在编辑后重新字体化源码块。如果 Lisp 代码修改了源码块却没有触发
-字体化，可以执行：
+Org 通常会在源码块被编辑后重新字体化。如果 Lisp 代码修改了源码块却没有触发
+字体化，请执行：
 
 =M-x org-diff-src-refontify-block=
 
 * 命令
 
-| 命令                            | 用途                               |
-|---------------------------------+------------------------------------|
-| =org-diff-src-setup=            | 注册 =ediff= 等语言别名。          |
-| =org-diff-src-compare-headings= | 比较当前 Org 缓冲区中的两个子树。  |
-| =org-diff-src-compare-files=    | 比较两个文件。                     |
-| =org-diff-src-compare-buffers=  | 比较两个缓冲区。                   |
-| =org-diff-src-insert-diff-file= | 把 diff 文件插入为源码块。         |
-| =org-diff-src-insert-from-kill= | 把当前 kill 插入为源码块。         |
-| =org-diff-src-wrap-region=      | 用源码块替换当前区域。             |
-| =org-diff-src-refontify-block=  | 重新字体化光标处的源码块。         |
+| 命令                            | 用途                              |
+|---------------------------------+-----------------------------------|
+| ~org-diff-src-setup~            | 注册 ~ediff~ 等语言别名。         |
+| ~org-diff-src-compare-headings~ | 比较当前 Org 缓冲区中的两个子树。 |
+| ~org-diff-src-compare-files~    | 比较两个文件。                    |
+| ~org-diff-src-compare-buffers~  | 比较两个缓冲区。                  |
+| ~org-diff-src-insert-diff-file~ | 把 diff 文件插入为源码块。        |
+| ~org-diff-src-insert-from-kill~ | 把当前 kill 插入为源码块。        |
+| ~org-diff-src-wrap-region~      | 用源码块替换当前区域。            |
+| ~org-diff-src-refontify-block~  | 重新字体化光标处的源码块。        |
 
 * Lisp API
 
-生成 diff 和插入源码块的函数与交互命令相互独立，因此可以被其他包复用。
+生成 diff 和插入的函数与交互命令相互独立，因此可以在其他包中直接使用。
 
-- =(org-diff-src-insert DIFF &optional LANGUAGE)= :: 在光标处把 =DIFF=
-  插入为带高亮的源码块，并返回源码块之后的位置。 =LANGUAGE= 默认为
-  =org-diff-src-default-language= ，并且必须映射到
-  =org-diff-src-mode= ；内置的 =org-diff-src= 语言会自动映射。如果
-  =DIFF= 为 nil 或空字符串，则插入 =org-diff-src-no-diff-message= 。
-- =(org-diff-src-setup &optional LANGUAGES)= :: 把 =LANGUAGES= （默认
-  =org-diff-src-extra-languages= ）注册到 =org-diff-src-mode= ，并返回
-  注册的语言列表。
-- =(org-diff-src-diff-strings OLD NEW &optional OLD-LABEL NEW-LABEL CODING)= ::
-  返回字符串 =OLD= 和 =NEW= 之间的 unified diff。
-- =(org-diff-src-diff-files OLD-FILE NEW-FILE &optional OLD-LABEL NEW-LABEL)= ::
-  返回两个文件之间的 unified diff。远程文件会先复制到本地临时文件。
-- =(org-diff-src-diff-buffers OLD-BUFFER NEW-BUFFER &optional OLD-LABEL
-  NEW-LABEL)= :: 返回两个缓冲区完整内容之间的 unified diff。
-- =org-diff-src-mode= :: 源码块使用的主模式。它派生自 =diff-mode= ，把
-  =diff-refine= 设为 =font-lock= ，并把细化结果写成文本属性。
+- ~(org-diff-src-insert DIFF &optional LANGUAGE)~ :: 把 ~DIFF~ 作为带高亮的
+  源码块插入光标处。~LANGUAGE~ 默认为 ~org-diff-src-default-language~ ，
+  并且必须映射到 ~org-diff-src-mode~ ；内置的 ~org-diff-src~ 语言会自动
+  满足这一点。返回源码块之后的位置。如果 ~DIFF~ 为 nil 或空字符串，插入
+  ~org-diff-src-no-diff-message~ 。
+- ~(org-diff-src-setup &optional LANGUAGES)~ :: 把 ~LANGUAGES~ （默认
+  ~org-diff-src-extra-languages~ ）注册到 ~org-diff-src-mode~ 。返回已注册
+  的语言列表。
+- ~(org-diff-src-diff-strings OLD NEW &optional OLD-LABEL NEW-LABEL CODING)~ ::
+  返回字符串 ~OLD~ 和 ~NEW~ 之间的 unified diff。
+- ~(org-diff-src-diff-files OLD-FILE NEW-FILE &optional OLD-LABEL NEW-LABEL)~ ::
+  返回两个文件之间的 unified diff。远程文件会先复制到本地。
+- ~(org-diff-src-diff-buffers OLD-BUFFER NEW-BUFFER &optional OLD-LABEL NEW-LABEL)~ ::
+  返回两个缓冲区完整内容之间的 unified diff。
+- ~org-diff-src-mode~ :: 源码块使用的主模式。它派生自 ~diff-mode~ ，把
+  ~diff-refine~ 设为 ~font-lock~ ，并把细化记录为文本属性。
 
 示例：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (with-current-buffer (get-buffer-create "*diff-demo*")
   (org-mode)
   (org-diff-src-insert
@@ -252,89 +280,104 @@ Org 通常会在编辑后重新字体化源码块。如果 Lisp 代码修改了�
 
 以编程方式比较两个缓冲区：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (org-diff-src-insert
  (org-diff-src-diff-buffers (get-buffer "notes-a")
                             (get-buffer "notes-b")
                             "before" "after"))
 #+end_src
 
-默认源码语言是 =org-diff-src= 。Org 会通过 =org-src-get-lang-mode=
-将其解析为 =org-diff-src-mode= ，不需要修改 =org-src-lang-modes= 。通过
-=org-diff-src-setup= 注册的别名也会以同样的方式解析。
+默认源码语言是 ~org-diff-src~ ；Org 会通过 ~org-src-get-lang-mode~ 把它
+解析为 ~org-diff-src-mode~ ，因此不需要修改 ~org-src-lang-modes~ 。通过
+~org-diff-src-setup~ 注册的别名也会以同样的方式解析。
 
 * 实现原理
 
-Org 在字体化源码块时，会从临时缓冲区复制 font-lock 的 =face= 文本属性，
-但不会复制 overlay。而 =diff-mode= 的字符级细化高亮是用 overlay 实现的，
-所以直接把 diff 放进 Org 时，细化高亮通常会丢失。
+Org 在字体化源码块时，会从临时缓冲区复制 font-lock 的 ~face~ 文本属性，
+但不会复制 overlay。而 Diff mode 的细化高亮是用 overlay 实现的，所以直接
+把 diff 放进 Org 时，细化高亮通常会丢失。
 
-=org-diff-src-mode= 的处理方式是：
+~org-diff-src-mode~ 的处理方式是：
 
-1. 从 =diff-mode= 派生。
-2. 把 =diff-refine= 设为 =font-lock= ，让 font-lock 计算细化结果。
-3. 用自定义函数替换 =diff--font-lock-refined= ，把细化 overlay 的 face
-   复制为 =face= 文本属性。
-4. Org 的 =org-src-font-lock-fontify-block= 随后就能把这些属性复制到 Org
+1. 从 ~diff-mode~ 派生。
+2. 把 ~diff-refine~ 设为 ~font-lock~ ，让 font-lock 计算细化结果。
+3. 把 ~diff-font-lock-keywords~ 中的 ~diff--font-lock-refined~ 替换为自定义
+   函数，把细化 overlay 的 face 复制为 ~face~ 文本属性。
+4. Org 的 ~org-src-font-lock-fontify-block~ 随后就能把这些属性复制到 Org
    缓冲区中。
 
-如果未来的 Emacs 移除了 diff-mode 的细化内部接口， =org-diff-src-mode= 会
+如果未来的 Emacs 移除了 Diff mode 的细化内部接口， ~org-diff-src-mode~ 会
 保留普通的行级高亮，而不是直接报错。
 
-这也是默认源码语言使用 =org-diff-src= 而不是 =diff= 的原因： Org 会把
-=diff= 解析为普通的 =diff-mode= ，除非你显式把它注册为别名。参见
+这也是默认源码语言使用 ~org-diff-src~ 而不是 ~diff~ 的原因： Org 会把
+~diff~ 解析为普通的 ~diff-mode~ ，除非你显式把它注册为别名。参见
 [[*最简配置：接管 diff 源码块][最简配置]]。
 
 * 自定义
 
-- =org-diff-src-diff-switches= :: 传递给 =diff-command= 的参数，默认是
-  =("-u")=。如果添加其他参数，请保留 =-u= ，因为细化代码需要 unified
+- ~org-diff-src-diff-switches~ :: 传递给 ~diff-command~ 的参数，默认是
+  ~("-u")~ 。如果添加其他参数，请保留 ~-u~ ，因为细化代码需要 unified
   diff。
-- =org-diff-src-no-diff-message= :: 差异为空时插入的文本，默认是
-  =# No differences= 。
-- =org-diff-src-default-language= :: 插入源码块时使用的语言，默认是
-  ="org-diff-src"= 。
-- =org-diff-src-extra-languages= :: 由 =org-diff-src-setup= 注册的语言，
-  默认是 =("ediff")= 。
-- =org-diff-src-fontify-immediately= :: 是否在插入源码块后立即字体化，
-  默认是 =t= 。对于很大的 diff，可以设为 nil。
-- Face :: 细化高亮使用 =diff-refine-removed= 、=diff-refine-added= 和
-  =diff-refine-changed= 。可以通过 =M-x customize-face= 或在
-  =custom-set-faces= 中自定义。
+- ~org-diff-src-no-diff-message~ :: 差异为空时插入的文本，默认是
+  ~# No differences~ 。
+- ~org-diff-src-default-language~ :: 插入源码块时使用的语言，默认是
+  ~"org-diff-src"~ 。
+- ~org-diff-src-extra-languages~ :: 由 ~org-diff-src-setup~ 注册的语言，
+  默认是 ~("ediff")~ 。
+- ~org-diff-src-fontify-immediately~ :: 是否在插入源码块后立即字体化，
+  默认是 ~t~ 。对于很大的 diff，可以设为 nil。
+- Face :: 细化高亮使用 ~diff-refine-removed~ 、 ~diff-refine-added~ 和
+  ~diff-refine-changed~ 。可以通过 =M-x customize-face= 或在
+  ~custom-set-faces~ 中自定义。
 
-该模式只在缓冲区局部设置 =diff-refine=，不需要修改它的全局值。
+该模式只在缓冲区局部设置 ~diff-refine~ ，不需要修改它的全局值。执行
+=M-x customize-group RET org-diff-src RET= 可以查看全部选项。
 
 * 限制
 
 - 只会细化 unified diff。Context diff 和 normal diff 会作为普通文本显示。
-- 字符级颜色是 Emacs 的显示属性。把 Org 文件导出为 HTML 或 PDF 时，diff
+- 细化颜色是 Emacs 的显示属性。把 Org 文件导出为 HTML 或 PDF 时，diff
   文本仍会保留，但不一定保留细化颜色。
-- 很大的 diff 在字体化时可能较慢，因为细化是逐字符计算的。
+- 很大的 diff 在字体化时可能较慢，因为细化是按 hunk 和字词计算的。
 - 差异两侧的标签会被压缩成一行。
-- 如果未来的 Emacs 移除了 diff-mode 的细化内部接口，本包会退化为行级高亮。
-- =org-diff-src-compare-headings= 比较的是完整子树，包括标题行。如果只想
-  比较部分正文，可以使用 =org-diff-src-diff-strings= 。
+- 如果未来的 Emacs 移除了 Diff mode 的细化内部接口，本包会退化为行级高亮。
+- ~org-diff-src-compare-headings~ 比较的是完整子树，包括标题行。如果只想
+  比较部分正文，可以使用 ~org-diff-src-diff-strings~ 。
 - 本包用于渲染静态 diff，不能替代 Ediff 或 Magit 的交互式合并功能。
+
+* 支持与贡献
+
+欢迎在 [[https://github.com/TomoeMami/org-diff-src/issues][issue tracker]] 报告 bug、提出功能请求或提交补丁。
+
+提交改动前请运行：
+
+#+begin_src shell
+make compile
+make test
+make checkdoc
+make package-lint
+#+end_src
+
+ERT 测试位于 [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]]。
 
 * 开发
 
-#+begin_src shell
-make compile       # 字节编译
-make test          # 运行 ERT 测试
-make checkdoc      # 运行 checkdoc
-make package-lint  # 需要预先安装 package-lint
-make clean
-#+end_src
+本包只有一个文件 ~org-diff-src.el~ 。MELPA 配方只打包这个文件：
 
-测试文件位于 [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]]。
+#+begin_src emacs-lisp
+(org-diff-src
+ :fetcher github
+ :repo "TomoeMami/org-diff-src"
+ :files ("org-diff-src.el"))
+#+end_src
 
 ** 扩展新的 diff 来源
 
 producer 就是一个返回 unified diff 字符串的函数。例如：
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (defun my/org-diff-src-from-git (rev-a rev-b)
-  "返回 REV-A 和 REV-B 之间的 unified diff。"
+  "Return a unified diff between REV-A and REV-B."
   (with-temp-buffer
     (let ((status (call-process "git" nil t nil
                                 "diff" "-u" (concat rev-a ".." rev-b))))
@@ -346,185 +389,12 @@ producer 就是一个返回 unified diff 字符串的函数。例如：
 #+end_src
 
 渲染层只关心 unified diff 文本，因此新的 producer 不需要修改
-=org-diff-src-mode= 。
+~org-diff-src-mode~ 。
 
-** 净室开发
+** 净室规格
 
-这一节面向希望独立实现相同用户可见行为的开发者：可以为 Emacs、为 Org，
-也可以为其他编辑器实现，而不复制本包的代码或文字。它借用 GNU 和其他自由
-软件项目长期使用的净室方法：一组人只根据公开文档和可观察行为整理规格；
-另一组人只根据这份规格编写实现。
-
-规格会详细说明问题、约束和必须满足的行为，但会有意省略实现机制。它不包含
-代码、函数名或变量名、数据结构、正则表达式，也不包含按步骤操作的配方。这些
-选择属于独立实现者。本 README 的其余部分记录的是本包的具体实现；如果要做
-严格的净室流程，只使用本节、Emacs 与 Org 的公开文档，以及黑盒观察。
-
-当实现由 AI 辅助完成时，同样的纪律仍然适用。本节被写成自包含的规格，可以
-作为唯一的项目相关输入；不要要求助手根据记忆或源码“还原”本包。下面的 AI
-辅助开发部分也给出了一套可操作的 AI 使用规范。
-
-需要说明的是，本节不是法律意见，也不能替代真正的双团队净室记录。它提供的
-是一个行为规格模板；如果你的场景需要可举证的法律意义上的净室过程，应由未
-接触源码的人独立整理规格，并保存实验、评审和沟通记录。
-
-*** 问题与核心约束
-
-Org 可以在源码块中显示 unified diff，但这样显示的 diff 往往会丢失编辑器
-内置 diff 模式在独立缓冲区中提供的字符级细化。用户能看到整行的新增和删除，
-却看不到具体哪些字符发生了变化。任务就是把这个区分恢复到 Org 缓冲区本身，
-不启动 Ediff 会话，也不要求 Org 和编辑器内置 diff 支持之外的包。
-
-真正困难的部分不是解析 unified diff，而是理解 Org 如何把源码块文本变成
-显示文本，并选择一种能穿过这条路径的细化表示。
-
-一个需要独立验证的核心约束是：Org 并不是简单地在 Org 缓冲区里对源码块文本
-运行某个主模式；它会在一个间接的上下文中准备显示，再把结果的一部分传回 Org
-缓冲区。这个传递是有损的，有些显示信息能保留，有些不能。一个在独立缓冲区里
-看起来完美的细化，放进 Org 后可能完全消失。
-
-这是应该最先调查的约束，也是独立实现者应该自己发现的部分。通用策略是：
-
-- 把字体化边界当成一份契约。通过 Org 中的公开实验，确定哪些显示表示能穿过
-  这个边界、哪些不能，并记录实验和结果。
-- 选择一种落在能够穿过边界的子集内的细化表示，并把细化计算安排在这种表示
-  能够产生的位置。
-- 把 diff 解析器和细化渲染器分开。解析器决定哪些行是新增、删除或上下文，
-  以及一行中哪些字符范围对应哪一侧；渲染器把这些范围变成显示属性。两者可以
-  在不重写对方的情况下替换。
-- 在合适的时候复用编辑器已有的 diff 解析和行级高亮。从零写解析器也可以，
-  但它不是这个功能的价值所在，而且更容易产生行为偏差。
-- 对你依赖的编辑器私有行为保留一层隔离，使未来的版本可以退回行级显示。优先
-  使用公开、有文档的接口；把私有接口当作可选的加速手段，而不是地基。
-- 在目标缓冲区中、经过正常的字体化路径之后再验证，而不是在计算细化的临时
-  缓冲区里验证。
-
-存在不止一种有效设计。规格要求的是可见结果，而不是某一种机制。
-
-*** 概念结构
-
-一种有用的分层是：
-
-1. 生产者：把输入变成 unified diff 文本。
-2. 插入器：把这段文本包装成源码块并放进 Org 缓冲区。
-3. 细化器：计算发生变化的字符范围及其显示方式。
-4. 集成层：让插入器和细化器满足字体化边界的要求。
-
-生产者层必须可替换；细化层不需要知道文本来自哪里；只有集成层需要了解 Org
-的字体化行为。这样可以把净室边界收得很小，也让测试更集中。
-
-*** 必须满足的行为
-
-符合规格的实现应满足以下可观察要求。它们按验收标准书写，而不是按设计书写。
-
-1. *渲染：*
-   插入 Org 缓冲区的 unified diff 显示为 Org 源码块。新增、删除
-   和上下文行得到通常的行级 diff 处理。在发生变化的行内，实际不同的字符与
-   未变化的字符在视觉上可区分。
-2. *持久性：*
-   经过正常字体化后，字符级结果存在于 Org 缓冲区中；源码块被
-   编辑并再次字体化后，结果能够恢复。它不能依赖某个临时缓冲区继续存活。
-3. *来源：*
-   同一条渲染路径接受来自独立生产者的 diff：两个字符串、两个文件、
-   两个缓冲区、两个 Org 子树、已有的 diff 文件、当前区域和 kill ring。
-   生产者只需提供合法的 unified diff 文本，不需要知道细化如何渲染。
-4. *没有隐藏会话：*
-   渲染不会启动 Ediff、创建新 frame，或留下多余窗口和
-   缓冲区。命令返回前，临时窗口变化应被恢复。
-5. *不影响剪贴板与 kill ring：*
-   比较或渲染 diff 不得改变 kill ring、yank
-   指针或系统剪贴板。从 kill ring 读取是允许的，写入不是。
-6. *不修改文件：*
-   比较文件只读取文件；远程文件的临时副本会被清理。
-7. *空输入：*
-   空 diff 产生一个有明确说明的占位文本，而不是报错或空块。
-8. *格式容忍：*
-   unified diff 会被细化；其他 diff 格式和畸形输入以文本形式
-   显示，不报错。细化失败不能让源码块变得不可读。
-9. *旧名称：*
-   用户可以把已有的源码块语言名映射到新的渲染器。注册别名不得
-   改变无关源码块的行为；把 =diff= 这类通用名称映射进来必须是显式选择。
-10. *优雅降级：*
-    如果编辑器改变了细化所依赖的内部行为，源码块仍能以行级
-    高亮工作。降级应在渲染时决定，而不是在加载时直接失败。
-11. *开销：*
-    渲染时间和内存随 diff 大小和变化区域增长。很大的 diff 可以
-    比较慢，但渲染被中断后缓冲区必须仍然有效，重试时不能重复叠加 face。
-12. *导出：*
-    diff 文本属于文档并正常导出。字符颜色是显示属性；实现不必在
-    HTML 或 PDF 导出中保留颜色，但不得破坏导出的文本。
-
-*** 有意省略的内容
-
-这份规格不说明：
-
-- 使用哪些 Org 或 diff 模式的平台接口、内部 hook 或数据结构；
-- 细化由哪一种显示机制承载；
-- 显示信息如何穿过字体化边界；
-- 解析算法、正则表达式或数据结构；
-- 命令名、自定义项名、源码块分隔符或错误消息；
-- 文件布局、实现顺序或测试数据。
-
-这些都是实现选择。如果一个行为必须点名某个私有机制才能测试，它多半被描述
-在了错误的层次上；请把它改写成用户能够观察到的结果。
-
-*** 独立验证
-
-- 在编写实现之前，先根据本节写出验收测试。
-- 只通过公开命令驱动，经过正常字体化后检查 Org 缓冲区。
-- 断言位置、可见文本和 face 属性；不要断言临时缓冲区、内部显示对象或私有
-  变量。
-- 至少覆盖：空 diff、单字符变化、整行替换、新增和删除文件、二进制 diff、
-  CRLF、非 ASCII、超长行、末尾缺少换行、畸形的 hunk 头。
-- 在每条命令执行前后，快照 kill ring、剪贴板、缓冲区列表、窗口配置和文件
-  修改时间。
-- 在支持的最旧和最新 Emacs 上运行测试；使用干净的 init，并分别测试开启和
-  关闭 font-lock 的情况。关闭 font-lock 时，即使没有细化，源码块也必须可读。
-- 不要复制本仓库的测试；它们属于实现，可能编码了具体机制。
-
-*** AI 辅助开发
-
-AI 助手可以在两个“房间”里发挥作用，但不能成为两个房间之间的通道。
-
-- 在规格房间中，AI 可以总结公开手册、发布说明、bug 报告和可观察行为，并
-  帮助把它们变成需求和测试想法。不要给它原始源码、注释或本 README 的实现
-  章节，也不要让它“还原”本包。
-- 在实现房间中，只给助手冻结后的规格和公开的平台文档。本节就是为这个用途
-  写成自包含的规格。
-- 保留来源记录：提示词、模型与版本、日期和输出。除了正确性，还要审查输出
-  与原始实现的相似度。相似度是证据，不是证明；看起来像是派生自原实现的
-  部分应当重写。
-- 按照项目的记录惯例披露 AI 参与，例如使用 =Assisted-by= 提交尾注。披露
-  不转移责任：必须由具名的人类维护者评审并接受结果。
-- 不要假设模型输出不附带第三方义务。在某些司法辖区，纯 AI 生成的材料可能
-  不受版权保护，或者作者身份不确定；人类的挑选、编排和修改才是可依赖的
-  部分。保留模型服务的条款记录，并让具名的人类承担责任。
-- 如果模型训练时见过原始仓库，它的输出不会自动成为复制品，但风险更高。优先
-  使用只基于规格的提示词，并审计结果。
-- 如果法律或平台政策要求标识 AI 生成内容，应遵守这些要求；提交尾注和发布
-  说明是一个合理的起点。
-
-对 Emacs 和 Org 本身的 AI 辅助贡献，这也是合理的默认做法：描述行为、披露
-工具、审查 diff、保留记录。
-
-*** 许可证边界
-
-- 版权保护表达，不保护思想、方法或功能行为。净室开发是独立创作的证据，不是
-  普遍的法律护盾；具体分析因司法辖区而异。
-- 独立实现如果没有复制本包的代码、注释或文字，可以由作者自行选择许可证。
-  如果复制或改编了本仓库的代码或文字，GPL-3.0-or-later 适用于被复制的部分，
-  并可能影响组合作品。
-- 兼容并不要求复用本包的名称或接口。请选择你自己的名称；提到本包时，把它
-  当作先前工作，而不是背书。
-- 专利、商标和商业秘密不在本节的讨论范围内。用于商业或高风险场景时，请
-  咨询律师。
-
-*** 把模式用到别处
-
-同样的推理适用于任何想在源码块中获得丰富显示的 Emacs 或 Org 功能：找出
-字体化边界，发现可传递的子集，把生产者和渲染器分开，提供降级路径，并在
-目标缓冲区中测试。diff 细化只是其中一个实例；行内注释、语法感知的折叠、
-外部数据预览都是别的实例。净室方法与具体功能无关。
+面向独立实现的行为规格见 [[file:CLEAN-ROOM-cn.org][CLEAN-ROOM-cn.org]]（英文：
+[[file:CLEAN-ROOM.org][CLEAN-ROOM.org]]）。它面向不想阅读本实现的开发者。
 
 * 许可证
 

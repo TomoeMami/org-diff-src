@@ -1,53 +1,78 @@
 #+title: org-diff-src
-#+subtitle: Character-level highlighted diffs in Org source blocks
+#+subtitle: Diff mode's refinement inside Org source blocks
 #+author: TomoeMami
+#+language: en
 #+options: toc:2 num:nil
 
-=org-diff-src= displays a unified diff as an Org source block and refines the
-display down to the characters that actually changed.  It is meant for keeping
-a reviewable diff inside notes, an issue, or an Org document without starting
-an Ediff session.
+#+html: <a href="https://www.gnu.org/software/emacs/"><img alt="Emacs 27.1 or later" src="https://img.shields.io/badge/Emacs-27.1%2B-blue"/></a>
+#+html: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue"/></a>
+
+# Add the MELPA badge after the recipe is merged:
+# #+html: <a href="https://melpa.org/#/org-diff-src"><img alt="MELPA" src="https://melpa.org/packages/org-diff-src-badge.svg"/></a>
 
 A Chinese translation is available at [[file:README-cn.org][README-cn.org]].
 
-The generated block uses the source language =org-diff-src= and the
-refinement faces from =diff-mode=: =diff-refine-removed=,
-=diff-refine-added=, and =diff-refine-changed=.
+Org renders ~diff~ source blocks with
+[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diff-Mode.html][Diff mode]], but their fine-grained highlighting usually disappears.  Org
+copies font-lock ~face~ properties from the temporary buffer used to fontify a
+block, while Diff mode stores its refinement in overlays.  ~org-diff-src~
+provides ~org-diff-src-mode~, a small ~diff-mode~ derivative that records the
+same refinement as ~face~ text properties, so the changed words stay colored
+inside the Org buffer.
 
-For a behavior-only specification intended for independent implementations,
-see [[*Clean-room development][Clean-room development]].
+The result is an ordinary Org source block: it can be folded, edited, and
+exported, and no Ediff session is started.  Diffs can come from two strings,
+two files, two buffers, or two Org subtrees.  A three-line configuration also
+lets the package take over the stock display of every ~diff~ block.
+
+#+caption: Diff mode's refinement in an Org source block.  The screenshot uses the ~ediff~ alias; a ~diff~ block looks the same after the minimal configuration.
+[[file:images/org-diff-src-example.png]]
+
+For a behavior-only specification aimed at independent implementations, see
+[[file:CLEAN-ROOM.org][CLEAN-ROOM.org]] (Chinese:
+[[file:CLEAN-ROOM-cn.org][CLEAN-ROOM-cn.org]]).
 
 * Features
 
-- Render any unified diff string, not only diffs of Org subtrees.
-- Character-level highlighting inside the Org buffer, not just line-level
-  added/removed faces.
-- Use the built-in =org-diff-src= language without setup, register
-  =ediff=-style aliases with =org-diff-src-setup=, or take over every
-  =diff= block with a three-line configuration.
+- Render any unified diff as an Org source block.
+- Keep Diff mode's refinement in the Org buffer, not only the line-level added
+  and removed faces.
+- Highlight the changed words, and the characters within them that differ,
+  with ~diff-refine-removed~, ~diff-refine-added~, and
+  ~diff-refine-changed~.
+- Work without setup through the built-in ~org-diff-src~ language.
+- Take over existing ~diff~ blocks with a three-line configuration.
 - Compare two Org subtrees, two files, or two buffers.
 - Copy subtrees without changing the kill ring or the system clipboard.
-- Start no Ediff session and require no package beyond Org and =diff-mode=.
+- Start no Ediff session and require no package beyond Org and Diff mode.
 - Use standard completion; Consult is not required.
+- Fall back to line-level highlighting if Diff mode's refinement internals
+  change.
 
 * Requirements
 
-- Emacs 27.1 or later.  The Org version bundled with Emacs 27.1 (Org 9.3) or
-  newer is sufficient.
-- A =diff= executable.  GNU diffutils is recommended.  Labels are passed with
-  =--label= when available and fall back to the portable =-L= option.
+- Emacs 27.1 or later.  The Org version bundled with Emacs 27.1 (Org 9.3) is
+  sufficient.
+- A ~diff~ executable.  GNU diffutils is recommended.  Labels use ~--label~
+  when available and fall back to the portable ~-L~ option.
+
 * Installation
+
+** MELPA
+
+The MELPA recipe is being submitted.  Once it is merged, install the package
+with =M-x package-install RET org-diff-src RET=.
 
 ** straight.el
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (straight-use-package
  '(org-diff-src :type git :host github :repo "TomoeMami/org-diff-src"))
 #+end_src
 
 With =use-package=:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (use-package org-diff-src
   :straight (:type git :host github :repo "TomoeMami/org-diff-src")
   :commands (org-diff-src-setup
@@ -62,40 +87,50 @@ With =use-package=:
 
 ** Manual
 
-Clone the repository and add it to =load-path=:
+Clone the repository and add it to ~load-path~:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (add-to-list 'load-path "/path/to/org-diff-src")
 (require 'org-diff-src)
 #+end_src
 
-** Minimal configuration for diff blocks
+* Minimal configuration for diff blocks
 
-By default this package does not touch =diff= blocks; it adds the
-=org-diff-src= language.  To change how every =diff= block is displayed
-instead, and to make newly inserted blocks use the =diff= language, use three
-lines:
+The package does not change ~diff~ blocks by default; it adds the
+~org-diff-src~ language.  To make every ~diff~ block use ~org-diff-src-mode~,
+and to make newly inserted blocks use the ~diff~ language, add three lines to
+your init file:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (require 'org-diff-src)                     ; load the package and Org
 (org-diff-src-setup '("diff"))              ; diff -> org-diff-src-mode
-(setq org-diff-src-default-language "diff") ; new blocks use diff
+(setq org-diff-src-default-language "diff") ; insert new blocks as diff
 #+end_src
 
-Org normally resolves the =diff= language to =diff-mode=, so a =diff= block
-shows only line-level additions and deletions.  The second line maps =diff= to
-=org-diff-src-mode=, which derives from =diff-mode= and adds character-level
-refinement.  It applies to existing and new =diff= blocks alike; blocks that
-are already displayed are refined at the next fontification, or immediately
-with =M-x org-diff-src-refontify-block=.
+The second line is the actual override.  Org resolves ~diff~ to ~diff-mode~ by
+default, which gives a ~diff~ block only the line-level added and removed
+faces.  Mapping ~diff~ to ~org-diff-src-mode~ adds Diff mode's refinement.  The
+mapping applies to existing and new blocks; a block that is already displayed
+is refined at the next fontification, or immediately with
+=M-x org-diff-src-refontify-block=.
 
-The third line only changes what the insertion and comparison commands write.
-Without it, new blocks keep using =org-diff-src=.
+The third line changes only the language written by ~org-diff-src-insert~ and
+the comparison commands.  Omit it to keep using ~org-diff-src~ as the block
+language; the examples in [[*Usage][Usage]] assume that default.
 
-If you use =use-package=, do not defer loading: the mapping must exist before
-Org first fontifies a =diff= block.
+This is an explicit opt-in: every ~diff~ block is affected, including blocks
+created by other packages.  ~org-diff-src-mode~ derives from ~diff-mode~, so
+=C-c '= editing, hunk commands, navigation, and folding keep working.  To
+restore the stock ~diff-mode~ display, remove the second line and set
+~org-diff-src-default-language~ back to ~"org-diff-src"~.  Only unified diffs
+are refined.
 
-#+begin_src elisp
+** use-package
+
+Do not defer loading: the mapping must exist before Org first fontifies a
+~diff~ block.
+
+#+begin_src emacs-lisp
 (use-package org-diff-src
   :straight (:type git :host github :repo "TomoeMami/org-diff-src")
   :demand t
@@ -104,10 +139,15 @@ Org first fontifies a =diff= block.
   (setq org-diff-src-default-language "diff"))
 #+end_src
 
-This is an explicit opt-in: it changes every =diff= block, including blocks
-written by other packages.  Editing with =C-c '=, navigation, and hunk
-commands keep working because the mode derives from =diff-mode=.  Only
-unified diffs are refined; see [[*Limitations][Limitations]] for the fallbacks.
+** Without the diff override
+
+The built-in ~org-diff-src~ language needs no setup:
+
+#+begin_src emacs-lisp
+(require 'org-diff-src)
+(org-diff-src-insert
+ (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n"))
+#+end_src
 
 * Usage
 
@@ -119,16 +159,16 @@ Open an Org buffer and run:
 
 Select the original heading, then the new heading.  Both subtrees are copied
 without touching the kill ring or clipboard, normalized to level 1, compared
-with =diff=, and inserted at point as an =org-diff-src= source block.
+with ~diff~, and inserted at point as an ~org-diff-src~ source block.
 
 For example, given:
 
 #+begin_src org
-* Original
+,* Original
 Some text.
 foo bar baz
 
-* New
+,* New
 Some text.
 foo BAR baz
 #+end_src
@@ -148,46 +188,42 @@ selecting =Original= and then =New= produces:
 #+end_src
 #+end_example
 
-The changed characters (=Original= / =New= and =bar= / =BAR=) are refined with
-character-level faces.  The heading lines are part of the comparison, so a
+The changed words (=Original= / =New= and =bar= / =BAR=) are colored with Diff
+mode's refinement faces.  The heading lines are part of the comparison, so a
 changed title appears in the diff as well.
-
-#+caption: A rendered diff block with character-level refinement.  The
-#+caption: screenshot uses the =ediff= alias.
-[[file:images/org-diff-src-example.png]]
 
 ** Language names and aliases
 
-The default source language is =org-diff-src=.  Org resolves it to
-=org-diff-src-mode= automatically, so newly generated blocks need no setup.
+The default language is ~org-diff-src~.  Org resolves it to
+~org-diff-src-mode~ automatically, so newly inserted ~org-diff-src~ blocks
+need no setup.
 
-If you already have blocks written as =ediff= (for example from the original
-snippet), register the alias once:
+If you have blocks written as ~ediff~ (for example from the original snippet),
+register the alias once:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (require 'org-diff-src)
 (org-diff-src-setup)
 #+end_src
 
-=org-diff-src-setup= maps every language in
-=org-diff-src-extra-languages= (default =("ediff")=) to
-=org-diff-src-mode=.  Run it before Org fontifies those blocks.
+~org-diff-src-setup~ maps each language in ~org-diff-src-extra-languages~
+(default ~("ediff")~) to ~org-diff-src-mode~.  Run it before Org fontifies
+those blocks.
 
-To make newly inserted blocks use =ediff= as well:
+To make newly inserted blocks use ~ediff~ as well:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (setq org-diff-src-default-language "ediff")
 #+end_src
 
 You can register more aliases explicitly:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (org-diff-src-setup '("ediff" "diff"))
 #+end_src
 
-Mapping =diff= makes every Org =diff= block use this mode.  See
-[[*Minimal configuration for diff blocks][Minimal configuration]] for the
-complete setup, including the language of newly inserted blocks.
+To take over ~diff~ blocks, see
+[[*Minimal configuration for diff blocks][Minimal configuration]].
 
 ** Render a diff you already have
 
@@ -216,46 +252,45 @@ block without triggering fontification, run:
 
 * Commands
 
-| Command                            | Purpose                                             |
-|------------------------------------+-----------------------------------------------------|
-| =org-diff-src-setup=               | Register language aliases such as =ediff=.          |
-| =org-diff-src-compare-headings=    | Compare two subtrees in the current Org buffer.     |
-| =org-diff-src-compare-files=       | Compare two files.                                  |
-| =org-diff-src-compare-buffers=     | Compare two buffers.                                |
-| =org-diff-src-insert-diff-file=    | Insert a diff file as a source block.               |
-| =org-diff-src-insert-from-kill=    | Insert the current kill as a source block.          |
-| =org-diff-src-wrap-region=         | Replace the region with a source block.             |
-| =org-diff-src-refontify-block=     | Refontify the block at point.                       |
+| Command                         | Purpose                                         |
+|---------------------------------+-------------------------------------------------|
+| ~org-diff-src-setup~            | Register language aliases such as ~ediff~.      |
+| ~org-diff-src-compare-headings~ | Compare two subtrees in the current Org buffer. |
+| ~org-diff-src-compare-files~    | Compare two files.                              |
+| ~org-diff-src-compare-buffers~  | Compare two buffers.                            |
+| ~org-diff-src-insert-diff-file~ | Insert a diff file as a source block.           |
+| ~org-diff-src-insert-from-kill~ | Insert the current kill as a source block.      |
+| ~org-diff-src-wrap-region~      | Replace the region with a source block.         |
+| ~org-diff-src-refontify-block~  | Refontify the block at point.                   |
 
 * Lisp API
 
 The diff-generation and insertion functions are independent of the interactive
 commands, so they can be used from other packages.
 
-- =(org-diff-src-insert DIFF &optional LANGUAGE)= :: Insert =DIFF= as a
-  fontified source block at point.  =LANGUAGE= defaults to
-  =org-diff-src-default-language= and must map to =org-diff-src-mode=; the
-  built-in =org-diff-src= language does so automatically.  Return the position
-  after the block.  If =DIFF= is nil or empty, insert
-  =org-diff-src-no-diff-message=.
-- =(org-diff-src-setup &optional LANGUAGES)= :: Register =LANGUAGES= (default
-  =org-diff-src-extra-languages=) for =org-diff-src-mode=.  Return the list of
+- ~(org-diff-src-insert DIFF &optional LANGUAGE)~ :: Insert ~DIFF~ as a
+  fontified source block at point.  ~LANGUAGE~ defaults to
+  ~org-diff-src-default-language~ and must map to ~org-diff-src-mode~; the
+  built-in ~org-diff-src~ language does so automatically.  Return the position
+  after the block.  If ~DIFF~ is nil or empty, insert
+  ~org-diff-src-no-diff-message~.
+- ~(org-diff-src-setup &optional LANGUAGES)~ :: Register ~LANGUAGES~ (default
+  ~org-diff-src-extra-languages~) for ~org-diff-src-mode~.  Return the list of
   registered languages.
-- =(org-diff-src-diff-strings OLD NEW &optional OLD-LABEL NEW-LABEL CODING)= ::
-  Return a unified diff between the strings =OLD= and =NEW=.
-- =(org-diff-src-diff-files OLD-FILE NEW-FILE &optional OLD-LABEL NEW-LABEL)= ::
+- ~(org-diff-src-diff-strings OLD NEW &optional OLD-LABEL NEW-LABEL CODING)~ ::
+  Return a unified diff between the strings ~OLD~ and ~NEW~.
+- ~(org-diff-src-diff-files OLD-FILE NEW-FILE &optional OLD-LABEL NEW-LABEL)~ ::
   Return a unified diff between two files.  Remote files are copied locally
   first.
-- =(org-diff-src-diff-buffers OLD-BUFFER NEW-BUFFER &optional OLD-LABEL
-  NEW-LABEL)= :: Return a unified diff between the entire contents of two
-  buffers.
-- =org-diff-src-mode= :: The major mode used for the block.  It derives from
-  =diff-mode=, sets =diff-refine= to =font-lock=, and writes refinement as
+- ~(org-diff-src-diff-buffers OLD-BUFFER NEW-BUFFER &optional OLD-LABEL NEW-LABEL)~ ::
+  Return a unified diff between the entire contents of two buffers.
+- ~org-diff-src-mode~ :: The major mode used for the block.  It derives from
+  ~diff-mode~, sets ~diff-refine~ to ~font-lock~, and records refinement as
   text properties.
 
 Example:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (with-current-buffer (get-buffer-create "*diff-demo*")
   (org-mode)
   (org-diff-src-insert
@@ -267,99 +302,116 @@ Example:
 
 To compare two buffers programmatically:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (org-diff-src-insert
  (org-diff-src-diff-buffers (get-buffer "notes-a")
                             (get-buffer "notes-b")
                             "before" "after"))
 #+end_src
 
-The default source language is =org-diff-src=; Org resolves it to
-=org-diff-src-mode= through =org-src-get-lang-mode=, so no entry in
-=org-src-lang-modes= is needed.  Aliases registered with
-=org-diff-src-setup= are resolved the same way.
+The default source language is ~org-diff-src~; Org resolves it to
+~org-diff-src-mode~ through ~org-src-get-lang-mode~, so no entry in
+~org-src-lang-modes~ is needed.  Aliases registered with ~org-diff-src-setup~
+are resolved the same way.
 
 * How it works
 
-Org copies font-lock =face= text properties, but not overlays, from the
-temporary buffer that it uses to fontify a source block.  =diff-mode=
-implements its fine-grained refinement with overlays, so the refinement is
-normally lost when a diff is displayed inside Org.
+Org copies font-lock ~face~ properties, but not overlays, from the temporary
+buffer it uses to fontify a source block.  Diff mode implements its refinement
+with overlays, so the refinement is normally lost when a diff is shown inside
+Org.
 
-=org-diff-src-mode= works around this:
+~org-diff-src-mode~ works around this:
 
-1. It derives from =diff-mode=.
-2. It sets =diff-refine= to =font-lock= so that refinement is computed by
+1. It derives from ~diff-mode~.
+2. It sets ~diff-refine~ to ~font-lock~ so that refinement is computed by
    font-lock.
-3. It replaces =diff--font-lock-refined= with a function that copies the
-   refinement overlay faces into =face= text properties.
-4. Org's =org-src-font-lock-fontify-block= can then copy those properties into
+3. It replaces the use of ~diff--font-lock-refined~ in
+   ~diff-font-lock-keywords~ with a function that copies the refinement overlay
+   faces into ~face~ text properties.
+4. Org's ~org-src-font-lock-fontify-block~ can then copy those properties into
    the Org buffer.
 
-If a future Emacs version removes the diff-mode refinement internals,
-=org-diff-src-mode= keeps the normal line-level highlighting instead of
+If a future Emacs version removes the Diff mode refinement internals,
+~org-diff-src-mode~ keeps the normal line-level highlighting instead of
 failing.
 
-This is why the default block language is =org-diff-src= rather than =diff=.
-Org resolves =diff= to plain =diff-mode= unless you register it as an alias;
+This is why the default block language is ~org-diff-src~ rather than ~diff~.
+Org resolves ~diff~ to plain ~diff-mode~ unless you register it as an alias;
 see the [[*Minimal configuration for diff blocks][minimal configuration]].
 
 * Customization
 
-- =org-diff-src-diff-switches= :: Switches passed to =diff-command=.  The
-  default is =("-u")=.  If you add switches, keep =-u= in the list because the
+- ~org-diff-src-diff-switches~ :: Switches passed to ~diff-command~.  The
+  default is ~("-u")~.  If you add switches, keep ~-u~ in the list because the
   refinement code expects a unified diff.
-- =org-diff-src-no-diff-message= :: Text inserted when the diff is empty.  The
-  default is =# No differences=.
-- =org-diff-src-default-language= :: Language used for inserted blocks.  The
-  default is ="org-diff-src"=.
-- =org-diff-src-extra-languages= :: Languages registered by
-  =org-diff-src-setup=.  The default is =("ediff")=.
-- =org-diff-src-fontify-immediately= :: Whether to fontify newly inserted
-  blocks immediately.  The default is =t=; turn it off for very large diffs.
-- Faces :: The refinement uses =diff-refine-removed=,
-  =diff-refine-added=, and =diff-refine-changed=.  Customize them with
-  =M-x customize-face= or in =custom-set-faces=.
+- ~org-diff-src-no-diff-message~ :: Text inserted when the diff is empty.  The
+  default is ~# No differences~.
+- ~org-diff-src-default-language~ :: Language used for inserted blocks.  The
+  default is ~"org-diff-src"~.
+- ~org-diff-src-extra-languages~ :: Languages registered by
+  ~org-diff-src-setup~.  The default is ~("ediff")~.
+- ~org-diff-src-fontify-immediately~ :: Whether to fontify newly inserted
+  blocks immediately.  The default is ~t~; turn it off for very large diffs.
+- Faces :: The refinement uses ~diff-refine-removed~, ~diff-refine-added~, and
+  ~diff-refine-changed~.  Customize them with =M-x customize-face= or in
+  ~custom-set-faces~.
 
-The mode sets =diff-refine= buffer-locally.  You do not need to change the
-global value of =diff-refine=.
+The mode sets ~diff-refine~ buffer-locally.  You do not need to change the
+global value of ~diff-refine~.  Run =M-x customize-group RET org-diff-src RET=
+to see all options.
 
 * Limitations
 
 - Only unified diffs are refined.  Context diffs and normal diffs are displayed
   as plain text.
-- The character-level colors are Emacs display properties.  HTML or PDF export
-  of the Org file shows the diff text, but not necessarily the refinement
-  colors.
-- Very large diffs can be slow to fontify because refinement is done per
-  changed character.
+- The refinement colors are Emacs display properties.  HTML or PDF export of
+  the Org file shows the diff text, but not necessarily the refinement colors.
+- Very large diffs can be slow to fontify because refinement is computed per
+  changed hunk and word.
 - Labels for the two diff sides are reduced to one line.
-- If a future Emacs removes the diff-mode refinement internals, the package
+- If a future Emacs removes the Diff mode refinement internals, the package
   falls back to line-level highlighting.
-- =org-diff-src-compare-headings= compares whole subtrees, including the
-  heading lines.  Use =org-diff-src-diff-strings= if you want to compare only
+- ~org-diff-src-compare-headings~ compares whole subtrees, including the
+  heading lines.  Use ~org-diff-src-diff-strings~ if you want to compare only
   selected body text.
 - This package renders static diffs.  It is not a replacement for Ediff or
   Magit when you need interactive merging.
 
-* Development
+* Support and Contributing
+
+Bug reports, feature requests, and patches are welcome at
+[[https://github.com/TomoeMami/org-diff-src/issues][the issue tracker]].
+
+Before sending a change, run:
 
 #+begin_src shell
-make compile       # byte-compile the package
-make test          # run the ERT test suite
-make checkdoc      # run checkdoc
-make package-lint  # requires package-lint to be installed
-make clean
+make compile
+make test
+make checkdoc
+make package-lint
 #+end_src
 
-The test suite is in [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]].
+The ERT suite is in [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]].
+
+* Development
+
+The package is a single file, ~org-diff-src.el~.  The MELPA recipe builds only
+that file:
+
+#+begin_src emacs-lisp
+(org-diff-src
+ :fetcher github
+ :repo "TomoeMami/org-diff-src"
+ :files ("org-diff-src.el"))
+#+end_src
 
 ** Adding another diff source
 
 A producer is simply a function that returns a unified diff string.  For
 example:
 
-#+begin_src elisp
+#+begin_src emacs-lisp
 (defun my/org-diff-src-from-git (rev-a rev-b)
   "Return a unified diff between REV-A and REV-B."
   (with-temp-buffer
@@ -373,234 +425,14 @@ example:
 #+end_src
 
 The rendering layer only cares about the unified diff text, so new producers
-do not need to touch =org-diff-src-mode=.
+do not need to touch ~org-diff-src-mode~.
 
-** Clean-room development
+** Clean-room specification
 
-This section is for developers who want to implement the same user-visible
-behavior independently, for Emacs, for Org, or for another editor, without
-copying this package's code or prose.  It follows the clean-room practice used
-in GNU and other free-software projects: one group derives a specification from
-public documentation and observable behavior; a separate group writes the
-implementation from that specification alone.
-
-The specification is detailed about the problem, the constraints, and the
-required behavior, and deliberately silent about the mechanism.  It contains no
-code, no function or variable names, no data structures, no regular expressions,
-and no step-by-step recipe.  Those choices belong to the independent
-implementer.  The rest of this README documents this particular implementation;
-for a strict clean-room process, use only this section, public Emacs and Org
-documentation, and black-box observation.
-
-The same discipline applies when the implementer is an AI assistant.  The
-section is self-contained so that it can be used as the only project-specific
-input; an assistant should not be asked to reconstruct the package from memory
-or from its source.  The notes on AI-assisted work below also serve as a
-practical AI-usage policy for such work.
-
-This section is not legal advice, and it is not a substitute for a documented
-two-team clean-room process.  It is a behavioral specification template.  If
-your situation needs a legally defensible clean-room record, have someone who
-has not seen the source prepare the specification independently, and keep the
-experiments, reviews, and communications.
-
-*** The problem and the central constraint
-
-Org can display a source block containing a unified diff, but a diff shown this
-way often loses the character-level refinement that the editor's built-in diff
-mode provides in a dedicated buffer.  The user sees whole added and removed
-lines, but not the exact characters that changed.  The task is to restore that
-distinction inside the Org buffer itself, without starting an Ediff session and
-without requiring a package beyond Org and the editor's built-in diff support.
-
-The difficult part is not parsing a unified diff.  It is understanding how Org
-turns source-block text into displayed text, and choosing a refinement
-representation that survives that path.
-
-A central constraint, which an independent implementer should confirm rather
-than assume, is that Org does not simply run a major mode over the block text in
-the Org buffer.  It prepares the display in an indirect context and transfers
-part of the result back.  The transfer is lossy: some display information
-survives, some does not.  A refinement that looks perfect in a dedicated buffer
-can disappear completely inside Org.
-
-This is the constraint to investigate first, and it is the part an independent
-implementation should discover for itself.  The general strategy is:
-
-- Treat the fontification boundary as a contract.  Determine, through public
-  experiments in Org, which display representations survive the boundary and
-  which do not.  Record the experiments and their results.
-- Choose a representation for the refinement that is inside the surviving
-  subset, and arrange for the refinement to be computed where that
-  representation can be produced.
-- Separate the diff parser from the refinement renderer.  The parser decides
-  which lines are added, removed, or context, and which character ranges within
-  a changed line belong to each side.  The renderer turns those ranges into
-  display attributes.  Either can be replaced without rewriting the other.
-- Reuse the editor's existing diff parsing and line-level faces where that is
-  practical.  A from-scratch parser is allowed, but it is not the source of the
-  feature's value and it increases the chance of behavioral drift.
-- Keep a seam around any private editor behavior you rely on, so that a future
-  version can fall back to line-level display.  Prefer public, documented
-  interfaces; treat private ones as optional accelerators, not as foundations.
-- Verify in the destination buffer, after the normal fontification path, not in
-  the temporary buffer where the refinement was computed.
-
-There is more than one valid design.  The specification requires the visible
-result, not a particular mechanism.
-
-*** Conceptual architecture
-
-A useful separation has four layers:
-
-1. Producer: turns inputs into unified-diff text.
-2. Inserter: wraps that text in a source block and places it in the Org buffer.
-3. Refiner: computes the changed character ranges and their display.
-4. Integration: makes the inserter and the refiner meet the fontification
-   boundary.
-
-The producer layer must be replaceable; the refinement layer must not need to
-know where the text came from; only the integration layer needs to know about
-Org's fontification behavior.  This keeps the clean-room boundary small and the
-tests focused.
-
-*** Required behavior
-
-A conforming implementation must satisfy these observable requirements.  They
-are written as acceptance criteria, not as a design.
-
-1. *Rendering.* A unified diff inserted into an Org buffer is displayed as an
-   Org source block.  Added, removed, and context lines receive the usual
-   line-level diff treatment.  Within changed lines, the characters that
-   actually differ are visually distinguished from unchanged characters.
-2. *Persistence.* The character-level result is present in the Org buffer after
-   normal fontification, and is restored after the block is edited and fontified
-   again.  It must not depend on a temporary buffer remaining alive.
-3. *Producers.* The same rendering path accepts diffs from independent
-   producers: two strings, two files, two buffers, two Org subtrees, an existing
-   diff file, the active region, and the kill ring.  A producer only has to
-   supply valid unified-diff text; it must not need to know how refinement is
-   rendered.
-4. *No hidden sessions.* Rendering does not start Ediff, create a frame, or
-   leave extra windows or buffers behind.  Any temporary window change is
-   restored before the command returns.
-5. *No clipboard or kill-ring side effects.* Comparing or rendering a diff must
-   not change the kill ring, the yank pointer, or the system clipboard.  Reading
-   a diff from the kill ring is allowed; writing to it is not.
-6. *No file side effects.* Comparing files reads them; it does not modify them.
-   Temporary copies of remote files are cleaned up.
-7. *Empty input.* An empty diff produces a documented placeholder instead of an
-   error or an empty block.
-8. *Format tolerance.* Unified diffs are refined.  Other diff formats and
-   malformed input are displayed as text without signaling an error.  A
-   refinement failure must not make the block unreadable.
-9. *Legacy names.* A user can map an existing source-block language name to the
-   new renderer.  Registering an alias must not change the behavior of unrelated
-   blocks, and mapping a generic name such as "diff" is an explicit opt-in.
-10. *Graceful degradation.* If the editor changes the internals on which
-    refinement depends, the block keeps working with line-level highlighting.
-    The fallback is decided when the block is rendered, not by failing to load
-    the package.
-11. *Cost.* Rendering time and memory grow with the size of the diff and the
-    changed regions.  Large diffs may be slow, but an interrupted render must
-    leave the buffer valid and must not stack duplicate faces on a retry.
-12. *Export.* The diff text is part of the document and exports normally.  The
-    character colors are display attributes; an implementation need not
-    preserve them in HTML or PDF export, but it must not corrupt the exported
-    text.
-
-*** What this specification leaves out
-
-This specification does not name:
-
-- which Org or diff-mode interfaces, internal hooks, or data structures to use;
-- which display mechanism carries the refinement;
-- how display information crosses the fontification boundary;
-- parsing algorithms, regular expressions, or data structures;
-- command names, customization names, source-block delimiters, or error
-  messages;
-- file layout, implementation order, or test fixtures.
-
-These are implementation choices.  If a behavior cannot be tested without
-naming a private mechanism, it is probably specified at the wrong level; restate
-it as something a user can observe.
-
-*** Verification without contamination
-
-- Write the acceptance tests from this section before writing the
-  implementation.
-- Drive the public commands only; inspect the Org buffer after normal
-  fontification.
-- Assert on position, visible text, and face properties.  Do not assert on
-  temporary buffers, internal display objects, or private variables.
-- Cover at least: empty diff, single-character change, whole-line replacement,
-  added and removed files, binary diff, CRLF, non-ASCII, a very long line, a
-  missing trailing newline, and a malformed hunk header.
-- Snapshot the kill ring, clipboard, buffer list, window configuration, and file
-  modification times before and after each command.
-- Run the suite on the oldest and newest supported Emacs, with a clean init, and
-  with font-lock both on and off.  With font-lock off, the block must still be
-  readable even if refinement is absent.
-- Do not copy this repository's tests; they are part of the implementation and
-  may encode its mechanism.
-
-*** AI-assisted clean-room work
-
-AI assistants are useful in both rooms, but they must not become a channel
-between them.
-
-- In the specification room, AI may summarize public manuals, release notes,
-  bug reports, and observed behavior, and may help turn them into requirements
-  and test ideas.  Do not give it the original source, comments, or the
-  implementation sections of this README, and do not ask it to reconstruct the
-  package.
-- In the implementation room, give the assistant the frozen specification and
-  public platform documentation only.  This section is written to be
-  self-contained for that purpose.
-- Keep provenance: prompts, model and version, dates, and outputs.  Review the
-  output for similarity to the original, not only for correctness.  Similarity
-  is evidence, not proof; rewrite anything that looks derivative.
-- Disclose AI assistance where the project records such things, for example in
-  an =Assisted-by= commit trailer.  Disclosure does not transfer
-  responsibility: a human maintainer reviews and accepts the result.
-- Do not assume that model output is free of third-party obligations.  In some
-  jurisdictions, material generated purely by a model may not attract copyright
-  at all, or its authorship may be uncertain; human selection, arrangement, and
-  revision are what make the result dependable.  Keep the provider's terms and
-  make a named human accountable.
-- If a model was trained on the original repository, its output is not
-  automatically a copy, but the risk is higher.  Prefer specification-only
-  prompts and audit the result.
-- If law or platform policy requires labeling AI-generated content, follow it;
-  a commit trailer and a release note are a reasonable start.
-
-These are reasonable norms for AI-assisted contributions to Emacs and Org as
-well: describe the behavior, disclose the tool, review the diff, and keep the
-record.
-
-*** Licensing boundary
-
-- Copyright protects expression, not ideas, methods, or functional behavior.
-  Clean-room development is evidence of independent creation; it is not a
-  universal legal shield, and the analysis varies by jurisdiction.
-- An independent implementation that copies no code, comments, or prose from
-  this package can be licensed as its author chooses.  If you copy or adapt code
-  or text from this repository, GPL-3.0-or-later applies to the copied material
-  and may affect the combined work.
-- Compatibility does not require reusing this package's names or interfaces.
-  Choose your own names; refer to this package as prior art, not as an
-  endorsement.
-- Patents, trademarks, and trade secrets are outside the scope of this section.
-  For a commercial or high-stakes port, consult a lawyer.
-
-*** Applying the pattern elsewhere
-
-The same reasoning applies to any Emacs or Org feature that wants rich display
-inside a source block: identify the fontification boundary, discover the
-transferable subset, keep producers and renderers separate, provide a fallback,
-and test in the destination buffer.  Diff refinement is one instance; inline
-annotations, syntax-aware folding, and previews of external data are others.
-The clean-room method is independent of the feature.
+A behavior-only specification for independent implementations is in
+[[file:CLEAN-ROOM.org][CLEAN-ROOM.org]] (Chinese:
+[[file:CLEAN-ROOM-cn.org][CLEAN-ROOM-cn.org]]).  It is written for implementers who do not want to read
+this implementation.
 
 * License
 

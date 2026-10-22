@@ -97,7 +97,7 @@ Point is assumed to be in a buffer containing STRING."
               'org-diff-src-mode)))
 
 (ert-deftest org-diff-src-test-insert-and-refine ()
-  "Inserting a diff creates a block with character-level faces."
+  "Inserting a diff creates a block with fine-grained faces."
   (org-diff-src-test-with-org ""
     (let ((diff (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n"
                                            "old" "new")))
@@ -268,6 +268,14 @@ Point is assumed to be in a buffer containing STRING."
     (org-diff-src-refontify-block)
     (should (memq 'diff-refine-added
                   (org-diff-src-test--faces-at "+TWO")))))
+
+(ert-deftest org-diff-src-test-refontify-empty-block ()
+  "Refontifying an empty diff block does not signal an error."
+  (org-diff-src-test-with-org "#+begin_src org-diff-src\n#+end_src\n"
+    (search-forward "#+end_src")
+    (org-diff-src-refontify-block)
+    (should (string-match-p "\\`#\\+begin_src org-diff-src"
+                            (buffer-string)))))
 
 (provide 'org-diff-src-test)
 

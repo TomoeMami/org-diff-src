@@ -1,4 +1,4 @@
-;;; org-diff-src.el --- Display unified diffs in Org source blocks -*- lexical-binding: t; -*-
+;;; org-diff-src.el --- Diff mode refinement in Org source blocks -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 TomoeMami
 
@@ -28,15 +28,14 @@
 
 ;;; Commentary:
 
-;; This package displays unified diff text as an Org source block with
-;; character-level highlighting.
-;;
-;; Org copies font-lock faces, but not overlays, from the temporary
-;; buffer used to fontify a source block.  `diff-mode' implements its
-;; fine-grained refinement with overlays, so the refinement is normally
-;; lost when a diff is shown inside Org.  The `org-diff-src-mode' defined
-;; here enables `diff-refine' = `font-lock' and turns the refinement
-;; overlays into `face' text properties, which Org can copy.
+;; This package brings the fine-grained highlighting of `diff-mode'
+;; into Org source blocks.  Org copies font-lock faces, but not
+;; overlays, from the temporary buffer used to fontify a source block.
+;; `diff-mode' implements its fine-grained refinement with overlays, so
+;; the refinement is normally lost when a diff is shown inside Org.
+;; The `org-diff-src-mode' defined here enables `diff-refine' =
+;; `font-lock' and turns the refinement overlays into `face' text
+;; properties, which Org can copy.
 ;;
 ;; The default block language is `org-diff-src', which Org resolves
 ;; to `org-diff-src-mode' without any setup.  If you already have
@@ -79,9 +78,9 @@
 ;;   +TWO
 ;;   #+end_src
 ;;
-;; The characters that actually changed are highlighted with the
-;; `diff-refine-removed', `diff-refine-added', and
-;; `diff-refine-changed' faces.  No Ediff session is started.
+;; The changed words are highlighted with the `diff-refine-removed',
+;; `diff-refine-added', and `diff-refine-changed' faces.  No Ediff
+;; session is started.
 
 ;;; Code:
 
@@ -279,7 +278,7 @@ temporary files."
          (buffer-local-value 'buffer-file-coding-system new)
          'utf-8-unix))))
 
-;;;; Character-level refinement
+;;;; Fine-grained refinement
 
 (defun org-diff-src--refinement-supported-p ()
   "Return non-nil when diff-mode's refinement internals are available."
@@ -307,7 +306,7 @@ over the line-level `diff-removed' or `diff-added' face."
               (put-text-property start finish 'face (cons face faces)))))))))
 
 (defun org-diff-src--font-lock-refined (max)
-  "Apply character-level refinement up to MAX.
+  "Apply `diff-mode' refinement up to MAX.
 This is a replacement for `diff--font-lock-refined' that records
 the refinement as `face' text properties instead of overlays, so
 that `org-src-font-lock-fontify-block' can copy it into the Org
@@ -414,18 +413,35 @@ Return the list of registered languages."
     (user-error "Language %s is not mapped to `org-diff-src-mode'; call `org-diff-src-setup' first"
                 language)))
 
+(defun org-diff-src--src-block-body-bounds (element)
+  "Return the body bounds of source block ELEMENT as (BEG END).
+The bounds are equal for an empty block.  Return nil if they cannot
+be determined."
+  (let ((post (org-element-property :post-affiliated element))
+        (end (org-element-property :end element)))
+    (when (and post end)
+      (save-excursion
+        (goto-char post)
+        (forward-line 1)
+        (let ((beg (point)))
+          (goto-char end)
+          (skip-chars-backward " \r\t\n")
+          (let ((end (line-beginning-position)))
+            (when (<= beg end)
+              (list beg end))))))))
+
 (defun org-diff-src--src-block-area ()
   "Return (BEG END LANGUAGE) for the diff block at point.
 A block qualifies when its language maps to `org-diff-src-mode'.
 Return nil when point is not inside such a source block."
   (let ((element (org-element-at-point)))
     (when (eq (org-element-type element) 'src-block)
-      (let ((language (org-element-property :language element)))
-        (when (and language
+      (let ((language (org-element-property :language element))
+            (bounds (org-diff-src--src-block-body-bounds element)))
+        (when (and language bounds
                    (eq (org-src-get-lang-mode language)
                        'org-diff-src-mode))
-          (let ((area (org-src--contents-area element)))
-            (list (nth 0 area) (nth 1 area) language)))))))
+          (list (nth 0 bounds) (nth 1 bounds) language))))))
 
 ;;;###autoload
 (defun org-diff-src-insert (diff &optional language)
