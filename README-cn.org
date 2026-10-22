@@ -20,7 +20,8 @@
 - 可以渲染任意 unified diff 字符串。
 - 在 Org 缓冲区中提供字符级高亮，而不只是整行的新增/删除 face。
 - 默认使用内置的 =org-diff-src= 语言，无需额外配置；也可以通过
-  =org-diff-src-setup= 注册 =ediff= 等别名。
+  =org-diff-src-setup= 注册 =ediff= 等别名，或用三行配置接管所有
+  =diff= 源码块。
 - 比较两个 Org 子树、两个文件或两个缓冲区。
 - 复制子树时不会修改 kill ring（剪贴环）或系统剪贴板。
 - 不启动 Ediff 会话，除 Org 和 =diff-mode= 外不依赖其他包。
@@ -64,6 +65,44 @@
 (add-to-list 'load-path "/path/to/org-diff-src")
 (require 'org-diff-src)
 #+end_src
+
+** 最简配置：接管 diff 源码块
+
+默认情况下本包不会改动 =diff= 源码块，只是新增了 =org-diff-src= 语言。
+如果希望覆盖 =diff= 源码块原有的显示方式，并让新插入的源码块也使用
+=diff= 语言，只需要三行：
+
+#+begin_src elisp
+(require 'org-diff-src)                     ; 加载本包和 Org
+(org-diff-src-setup '("diff"))              ; diff -> org-diff-src-mode
+(setq org-diff-src-default-language "diff") ; 新插入的块使用 diff
+#+end_src
+
+Org 默认把 =diff= 语言解析为 =diff-mode= ，所以 =diff= 块只有整行的新增/
+删除高亮。第二行把 =diff= 映射到 =org-diff-src-mode= ，它派生自
+=diff-mode= ，并额外提供字符级细化。该映射对已有和新建的 =diff= 块都生效；
+已经显示出来的块会在下一次字体化时细化，也可以立即执行
+=M-x org-diff-src-refontify-block= 。
+
+第三行只决定插入和比较命令写成什么语言。不设置它时，新生成的块仍然使用
+=org-diff-src= 。
+
+如果使用 =use-package= ，请不要延迟加载：映射必须在 Org 第一次字体化
+=diff= 块之前就已经安装。
+
+#+begin_src elisp
+(use-package org-diff-src
+  :straight (:type git :host github :repo "TomoeMami/org-diff-src")
+  :demand t
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+这是显式接管：它会改变所有 =diff= 源码块，包括其他包生成的块。由于
+=org-diff-src-mode= 派生自 =diff-mode= ，用 =C-c '= 编辑、导航和 hunk
+命令都仍然可用。只有 unified diff 会被细化，其他格式的行为见
+[[*限制][限制]]。
 
 * 使用
 
@@ -133,12 +172,14 @@ foo BAR baz
 (setq org-diff-src-default-language "ediff")
 #+end_src
 
-也可以显式注册更多别名。把 =diff= 映射进来会让所有 Org =diff= 源码块都
-使用本模式，因此只在你确实希望如此时才这样做：
+也可以显式注册更多别名：
 
 #+begin_src elisp
 (org-diff-src-setup '("ediff" "diff"))
 #+end_src
+
+把 =diff= 映射进来会让所有 Org =diff= 源码块都使用本模式。完整配置（包括
+新插入源码块使用的语言）见 [[*最简配置：接管 diff 源码块][最简配置]]。
 
 ** 渲染已有的 diff
 
@@ -240,8 +281,9 @@ Org 在字体化源码块时，会从临时缓冲区复制 font-lock 的 =face= 
 如果未来的 Emacs 移除了 diff-mode 的细化内部接口， =org-diff-src-mode= 会
 保留普通的行级高亮，而不是直接报错。
 
-这也是默认源码语言使用 =org-diff-src= 而不是 =diff= 的原因： =diff= 会映射
-到普通的 =diff-mode= ，除非你显式把它注册为别名。
+这也是默认源码语言使用 =org-diff-src= 而不是 =diff= 的原因： Org 会把
+=diff= 解析为普通的 =diff-mode= ，除非你显式把它注册为别名。参见
+[[*最简配置：接管 diff 源码块][最简配置]]。
 
 * 自定义
 

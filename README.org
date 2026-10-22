@@ -22,8 +22,9 @@ see [[*Clean-room development][Clean-room development]].
 - Render any unified diff string, not only diffs of Org subtrees.
 - Character-level highlighting inside the Org buffer, not just line-level
   added/removed faces.
-- Use the built-in =org-diff-src= language without setup, or register
-  =ediff=-style aliases with =org-diff-src-setup=.
+- Use the built-in =org-diff-src= language without setup, register
+  =ediff=-style aliases with =org-diff-src-setup=, or take over every
+  =diff= block with a three-line configuration.
 - Compare two Org subtrees, two files, or two buffers.
 - Copy subtrees without changing the kill ring or the system clipboard.
 - Start no Ediff session and require no package beyond Org and =diff-mode=.
@@ -67,6 +68,46 @@ Clone the repository and add it to =load-path=:
 (add-to-list 'load-path "/path/to/org-diff-src")
 (require 'org-diff-src)
 #+end_src
+
+** Minimal configuration for diff blocks
+
+By default this package does not touch =diff= blocks; it adds the
+=org-diff-src= language.  To change how every =diff= block is displayed
+instead, and to make newly inserted blocks use the =diff= language, use three
+lines:
+
+#+begin_src elisp
+(require 'org-diff-src)                     ; load the package and Org
+(org-diff-src-setup '("diff"))              ; diff -> org-diff-src-mode
+(setq org-diff-src-default-language "diff") ; new blocks use diff
+#+end_src
+
+Org normally resolves the =diff= language to =diff-mode=, so a =diff= block
+shows only line-level additions and deletions.  The second line maps =diff= to
+=org-diff-src-mode=, which derives from =diff-mode= and adds character-level
+refinement.  It applies to existing and new =diff= blocks alike; blocks that
+are already displayed are refined at the next fontification, or immediately
+with =M-x org-diff-src-refontify-block=.
+
+The third line only changes what the insertion and comparison commands write.
+Without it, new blocks keep using =org-diff-src=.
+
+If you use =use-package=, do not defer loading: the mapping must exist before
+Org first fontifies a =diff= block.
+
+#+begin_src elisp
+(use-package org-diff-src
+  :straight (:type git :host github :repo "TomoeMami/org-diff-src")
+  :demand t
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+This is an explicit opt-in: it changes every =diff= block, including blocks
+written by other packages.  Editing with =C-c '=, navigation, and hunk
+commands keep working because the mode derives from =diff-mode=.  Only
+unified diffs are refined; see [[*Limitations][Limitations]] for the fallbacks.
 
 * Usage
 
@@ -138,12 +179,15 @@ To make newly inserted blocks use =ediff= as well:
 (setq org-diff-src-default-language "ediff")
 #+end_src
 
-You can register more aliases explicitly.  Mapping =diff= makes every Org
-=diff= block use this mode, so do it only if that is what you want:
+You can register more aliases explicitly:
 
 #+begin_src elisp
 (org-diff-src-setup '("ediff" "diff"))
 #+end_src
+
+Mapping =diff= makes every Org =diff= block use this mode.  See
+[[*Minimal configuration for diff blocks][Minimal configuration]] for the
+complete setup, including the language of newly inserted blocks.
 
 ** Render a diff you already have
 
@@ -257,8 +301,8 @@ If a future Emacs version removes the diff-mode refinement internals,
 failing.
 
 This is why the default block language is =org-diff-src= rather than =diff=.
-The latter maps to plain =diff-mode= unless you explicitly register it as an
-alias.
+Org resolves =diff= to plain =diff-mode= unless you register it as an alias;
+see the [[*Minimal configuration for diff blocks][minimal configuration]].
 
 * Customization
 

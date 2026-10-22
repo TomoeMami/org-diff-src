@@ -203,6 +203,32 @@ Point is assumed to be in a buffer containing STRING."
       (should (memq 'diff-refine-added
                     (org-diff-src-test--faces-at "+TWO"))))))
 
+(ert-deftest org-diff-src-test-diff-alias-override ()
+  "Mapping `diff' refines stock diff blocks and honors the new default."
+  (let ((org-src-lang-modes (copy-tree org-src-lang-modes))
+        (org-diff-src-default-language "diff"))
+    (org-diff-src-setup '("diff"))
+    (should (eq (org-src-get-lang-mode "diff") 'org-diff-src-mode))
+    ;; A block that already exists is refined on refontification.
+    (org-diff-src-test-with-org
+        (concat "#+begin_src diff\n"
+                "--- old\n+++ new\n"
+                "@@ -1,2 +1,2 @@\n one\n-two\n+TWO\n"
+                "#+end_src\n")
+      (search-forward "+TWO")
+      (org-diff-src-refontify-block)
+      (should (memq 'diff-refine-added
+                    (org-diff-src-test--faces-at "+TWO")))
+      (should (memq 'diff-refine-removed
+                    (org-diff-src-test--faces-at "-two"))))
+    ;; New blocks use the diff language and are refined immediately.
+    (org-diff-src-test-with-org ""
+      (org-diff-src-insert
+       (org-diff-src-diff-strings "one\ntwo\n" "one\nTWO\n" "old" "new"))
+      (should (string-match-p "\\`#\\+begin_src diff\n" (buffer-string)))
+      (should (memq 'diff-refine-added
+                    (org-diff-src-test--faces-at "+TWO"))))))
+
 (ert-deftest org-diff-src-test-unregistered-language ()
   "Insertion refuses a language not mapped to `org-diff-src-mode'."
   (org-diff-src-test-with-org ""

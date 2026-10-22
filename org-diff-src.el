@@ -44,6 +44,15 @@
 ;; `org-diff-src-setup' to map those languages to the mode; the
 ;; languages to map are listed in `org-diff-src-extra-languages'.
 ;;
+;; To replace the stock behavior of Org's "diff" blocks instead, map
+;; "diff" and make newly inserted blocks use it:
+;;
+;;   (org-diff-src-setup '("diff"))
+;;   (setq org-diff-src-default-language "diff")
+;;
+;; This is an explicit opt-in: it changes every "diff" block, not only
+;; the ones produced by this package.
+;;
 ;; The core entry point is `org-diff-src-insert', which accepts any
 ;; unified diff string.  Diffs can be produced by the helpers
 ;; `org-diff-src-diff-strings', `org-diff-src-diff-files', and
