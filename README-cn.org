@@ -102,7 +102,7 @@ diff 可以来自两个字符串、两个文件、两个缓冲区或两个 Org �
 
 ** 使用 use-package 的 :vc 关键字
 
-在 Emacs 30.1 及更高版本中，=use-package= 的 =:vc= 关键字可以直接从 GitHub
+在 Emacs 30.1 及更高版本中， =use-package= 的 =:vc= 关键字可以直接从 GitHub
 下载 ~org-diff-src~ ，不需要 package archive：
 
 #+begin_src emacs-lisp
@@ -113,8 +113,8 @@ diff 可以来自两个字符串、两个文件、两个缓冲区或两个 Org �
   (setq org-diff-src-default-language "diff"))
 #+end_src
 
-=:rev :newest= 会检出最新提交。如果不写 =:rev= ，=:vc= 默认尝试检出最近一次
-release；本仓库没有 release tag，因此请保留 =:rev :newest= 。=:vc= 需要
+=:rev :newest= 会检出最新提交。如果不写 =:rev= ， =:vc= 默认尝试检出最近一次
+release；本仓库没有 release tag，因此请保留 =:rev :newest= 。 =:vc= 需要
 ~git~ 和网络连接。以后更新时执行
 =M-x package-vc-upgrade RET org-diff-src RET= 。
 
