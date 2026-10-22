@@ -6,9 +6,7 @@
 
 #+html: <a href="https://www.gnu.org/software/emacs/"><img alt="Emacs 27.1 or later" src="https://img.shields.io/badge/Emacs-27.1%2B-blue"/></a>
 #+html: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue"/></a>
-
-# Add the MELPA badge after the recipe is merged:
-# #+html: <a href="https://melpa.org/#/org-diff-src"><img alt="MELPA" src="https://melpa.org/packages/org-diff-src-badge.svg"/></a>
+#+html: <a href="https://blog.prayhand13013.top/tomoelpa/"><img alt="TomoElpa" src="https://img.shields.io/badge/TomoElpa-org--diff--src-blue"/></a>
 
 A Chinese translation is available at [[file:README-cn.org][README-cn.org]].
 
@@ -58,10 +56,77 @@ For a behavior-only specification aimed at independent implementations, see
 
 * Installation
 
-** MELPA
+** TomoElpa (recommended)
 
-The MELPA recipe is being submitted.  Once it is merged, install the package
-with =M-x package-install RET org-diff-src RET=.
+[[https://blog.prayhand13013.top/tomoelpa/][TomoElpa]] is the recommended way to install
+~org-diff-src~.  It provides snapshots built from the latest commit and tagged
+releases.  The archive paths have no browsable directory listing; the landing
+page above lists the packages, and the URLs below are the ones =package.el=
+reads.  Add the snapshots archive, refresh the package index, and let
+=use-package= install and configure the package (=use-package= is bundled with
+Emacs 29 and later; on Emacs 27–28, install it from GNU ELPA first):
+
+#+begin_src emacs-lisp
+(require 'package)
+(add-to-list 'package-archives
+             '("tomoelpa-snapshots" .
+               "https://blog.prayhand13013.top/tomoelpa/snapshots/") t)
+(package-initialize)
+(package-refresh-contents)  ; once, or after the archive changes
+
+(require 'use-package)
+
+(use-package org-diff-src
+  :ensure t
+  :pin tomoelpa-snapshots
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+The =:config= block is the optional
+[[*Minimal configuration for diff blocks][diff takeover]] described below.
+Remove it to keep the package's default ~org-diff-src~ language.
+
+If you prefer tagged releases over snapshots, use the releases archive and pin
+to it instead:
+
+#+begin_src emacs-lisp
+(add-to-list 'package-archives
+             '("tomoelpa-releases" .
+               "https://blog.prayhand13013.top/tomoelpa/releases/") t)
+(package-refresh-contents)
+
+(use-package org-diff-src
+  :ensure t
+  :pin tomoelpa-releases
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+Without =use-package=, install the package once with
+=M-x package-install RET org-diff-src RET=.
+
+** use-package with :vc
+
+On Emacs 30.1 and later, the =:vc= keyword of =use-package= can download
+~org-diff-src~ directly from GitHub, without a package archive:
+
+#+begin_src emacs-lisp
+(use-package org-diff-src
+  :vc (:url "https://github.com/TomoeMami/org-diff-src" :rev :newest)
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+=:rev :newest= checks out the latest commit.  Without =:rev=, =:vc= defaults to
+the last release; this repository has no release tags, so keep =:rev :newest=.
+=:vc= needs ~git~ and network access.  To update later, run
+=M-x package-vc-upgrade RET org-diff-src RET=.
+
+On older Emacs versions, use TomoElpa or =straight.el= instead.
 
 ** straight.el
 
@@ -396,15 +461,10 @@ The ERT suite is in [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]
 
 * Development
 
-The package is a single file, ~org-diff-src.el~.  The MELPA recipe builds only
-that file:
-
-#+begin_src emacs-lisp
-(org-diff-src
- :fetcher github
- :repo "TomoeMami/org-diff-src"
- :files ("org-diff-src.el"))
-#+end_src
+The package is a single file, ~org-diff-src.el~.  It is distributed through
+[[https://blog.prayhand13013.top/tomoelpa/][TomoElpa]]; the recipe and build
+configuration live in the [[https://github.com/TomoeMami/tomoelpa][tomoelpa
+repository]].
 
 ** Adding another diff source
 

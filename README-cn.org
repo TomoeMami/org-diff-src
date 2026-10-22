@@ -6,16 +6,14 @@
 
 #+html: <a href="https://www.gnu.org/software/emacs/"><img alt="Emacs 27.1 或更高" src="https://img.shields.io/badge/Emacs-27.1%2B-blue"/></a>
 #+html: <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img alt="GPL-3.0-or-later" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue"/></a>
-
-# MELPA 收录后可以加上这个徽章：
-# #+html: <a href="https://melpa.org/#/org-diff-src"><img alt="MELPA" src="https://melpa.org/packages/org-diff-src-badge.svg"/></a>
+#+html: <a href="https://blog.prayhand13013.top/tomoelpa/"><img alt="TomoElpa" src="https://img.shields.io/badge/TomoElpa-org--diff--src-blue"/></a>
 
 英文版见 [[file:README.org][README.org]]。
 
 Org 会用 [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Diff-Mode.html][Diff mode]] 渲染 ~diff~ 源码块，但其中的细粒度高亮通常会消失：
 Org 只从用于字体化源码块的临时缓冲区复制 font-lock 的 ~face~ 属性，而 Diff
 mode 的 refinement（细化）保存在 overlay 里。~org-diff-src~ 提供
-~org-diff-src-mode~：一个派生自 ~diff-mode~ 的小模式，它把同样的细化记录为
+~org-diff-src-mode~ ：一个派生自 ~diff-mode~ 的小模式，它把同样的细化记录为
 ~face~ 文本属性，因此发生变化的字词在 Org 缓冲区中仍然带有颜色。
 
 渲染结果是普通的 Org 源码块，可以折叠、编辑和导出，也不会启动 Ediff 会话。
@@ -50,11 +48,77 @@ diff 可以来自两个字符串、两个文件、两个缓冲区或两个 Org �
 
 * 安装
 
-** MELPA
+** TomoElpa（推荐）
 
-MELPA 配方正在提交中。收录后可以这样安装：
+[[https://blog.prayhand13013.top/tomoelpa/][TomoElpa]] 是安装 ~org-diff-src~ 的推荐方式。
+它同时提供基于最新提交的 snapshots 和带版本号的 releases。归档路径没有
+可浏览的目录索引；包列表请看上面的 TomoElpa 页面，下面的 URL 是
+=package.el= 实际读取的地址。把 snapshots 归档加入 ~package-archives~ ，
+刷新包索引，然后让 =use-package= 安装并配置
+（Emacs 29 及更高版本自带 =use-package= ；Emacs 27–28 需要先从 GNU ELPA
+安装）：
 
-=M-x package-install RET org-diff-src RET=
+#+begin_src emacs-lisp
+(require 'package)
+(add-to-list 'package-archives
+             '("tomoelpa-snapshots" .
+               "https://blog.prayhand13013.top/tomoelpa/snapshots/") t)
+(package-initialize)
+(package-refresh-contents)  ; 只需执行一次，或在归档更新后执行
+
+(require 'use-package)
+
+(use-package org-diff-src
+  :ensure t
+  :pin tomoelpa-snapshots
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+上面的 ~:config~ 就是下文的可选
+[[*最简配置：接管 diff 源码块][diff 接管配置]]；如果不需要，删掉 ~:config~
+即可，包会继续使用默认的 ~org-diff-src~ 语言。
+
+如果希望使用带版本号的 releases 通道而不是 snapshots，把归档换成
+~tomoelpa-releases~ 并相应修改 ~:pin~ ：
+
+#+begin_src emacs-lisp
+(add-to-list 'package-archives
+             '("tomoelpa-releases" .
+               "https://blog.prayhand13013.top/tomoelpa/releases/") t)
+(package-refresh-contents)
+
+(use-package org-diff-src
+  :ensure t
+  :pin tomoelpa-releases
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+不使用 =use-package= 时，执行一次
+=M-x package-install RET org-diff-src RET= 即可安装。
+
+** 使用 use-package 的 :vc 关键字
+
+在 Emacs 30.1 及更高版本中，=use-package= 的 =:vc= 关键字可以直接从 GitHub
+下载 ~org-diff-src~ ，不需要 package archive：
+
+#+begin_src emacs-lisp
+(use-package org-diff-src
+  :vc (:url "https://github.com/TomoeMami/org-diff-src" :rev :newest)
+  :config
+  (org-diff-src-setup '("diff"))
+  (setq org-diff-src-default-language "diff"))
+#+end_src
+
+=:rev :newest= 会检出最新提交。如果不写 =:rev= ，=:vc= 默认尝试检出最近一次
+release；本仓库没有 release tag，因此请保留 =:rev :newest= 。=:vc= 需要
+~git~ 和网络连接。以后更新时执行
+=M-x package-vc-upgrade RET org-diff-src RET= 。
+
+更旧的 Emacs 版本请使用 TomoElpa 或 =straight.el= 。
 
 ** straight.el
 
@@ -362,14 +426,9 @@ ERT 测试位于 [[file:test/org-diff-src-test.el][test/org-diff-src-test.el]]�
 
 * 开发
 
-本包只有一个文件 ~org-diff-src.el~ 。MELPA 配方只打包这个文件：
-
-#+begin_src emacs-lisp
-(org-diff-src
- :fetcher github
- :repo "TomoeMami/org-diff-src"
- :files ("org-diff-src.el"))
-#+end_src
+本包只有一个文件 ~org-diff-src.el~ 。它通过
+[[https://blog.prayhand13013.top/tomoelpa/][TomoElpa]] 分发；配方和构建配置位于
+[[https://github.com/TomoeMami/tomoelpa][tomoelpa 仓库]]。
 
 ** 扩展新的 diff 来源
 
